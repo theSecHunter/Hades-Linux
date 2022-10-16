@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"hades-ebpf/user/decoder"
 	"hades-ebpf/user/helper"
-	"time"
 
 	manager "github.com/ehids/ebpfmanager"
 )
@@ -61,16 +60,15 @@ func (s *SCTScan) Trigger(m *manager.Manager) error {
 		return err
 	}
 
-	for i := 0; i < 2000; i++ {
+	for i := 0; i < 302; i++ {
 		s.trigger(sct.Address, uint64(i))
 	}
 
 	return nil
 }
 
-func (s *SCTScan) RegistCron() (decoder.EventCronFunc, *time.Ticker) {
-	ticker := time.NewTicker(10 * time.Minute)
-	return s.Trigger, ticker
+func (s *SCTScan) RegistCron() (string, decoder.EventCronFunc) {
+	return "* */10 * * * *", s.Trigger
 }
 
 //go:noinline
