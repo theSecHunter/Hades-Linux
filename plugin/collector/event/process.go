@@ -1,7 +1,7 @@
 package event
 
 import (
-	"collector/cache"
+	"collector/cache/process"
 	"strconv"
 	"time"
 
@@ -29,18 +29,13 @@ func (Process) String() string {
 	return "process"
 }
 
-// TODO: Log process
 func (p Process) Run() (result map[string]interface{}, err error) {
 	result = make(map[string]interface{})
-	var processes []*cache.Process
+	var processes []*process.Process
 	processes, err = p.getProcess()
 	if err != nil {
 		zap.S().Error("getprocess, err:", err)
 		return
-	}
-	for _, process := range processes {
-		cache.ProcessCache.Add(uint32(process.PID), uint32(process.PPID))
-		cache.ProcessCmdlineCache.Add(uint32(process.PID), process.Exe)
 	}
 	for _, process := range processes {
 		result[strconv.Itoa(process.PID)] = process
@@ -51,14 +46,14 @@ func (p Process) Run() (result map[string]interface{}, err error) {
 	return
 }
 
-func (Process) getProcess() (procs []*cache.Process, err error) {
+func (Process) getProcess() (procs []*process.Process, err error) {
 	var pids []int
-	pids, err = cache.GetPids(maxProcess)
+	pids, err = process.GetPids(maxProcess)
 	if err != nil {
 		return
 	}
 	for _, pid := range pids {
-		proc, err := cache.GetProcessInfo(pid, false)
+		proc, err := process.GetProcessInfo(pid, false)
 		if err != nil {
 			continue
 		}
