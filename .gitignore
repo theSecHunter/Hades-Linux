@@ -27,15 +27,17 @@ cert/
 **/*.gz
 
 # ignore binary
-plugin/ebpfdriver/ebpfdriver
-plugin/collector/collector
+plugins/ebpfdriver/ebpfdriver
+plugins/collector/collector
+plugins/ncp/ncp
 
 # libbpf test
-plugin/ebpfdriver/kern/headers/libbpf
-plugin/ebpfdriver/kern/headers/*.h
+plugins/ebpfdriver/kern/headers/libbpf
+plugins/ebpfdriver/kern/headers/*.h
 
 # pprof
 *.pprof
 
 # windows
 **/*.exe
+plugins/ncp/ncp
