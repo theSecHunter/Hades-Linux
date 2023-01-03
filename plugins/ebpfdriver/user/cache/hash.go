@@ -1,7 +1,9 @@
 package cache
 
 import (
-	"github.com/chriskaliX/SDK/util/hash"
+	"hades-ebpf/utils"
+
+	"github.com/chriskaliX/SDK/utils/hash"
 )
 
-var DefaultHashCache hash.IHashCache
+var DefaultHashCache = hash.NewWithClock(utils.Clock)

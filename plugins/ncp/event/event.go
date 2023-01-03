@@ -13,7 +13,7 @@ import (
 
 	"ncp/utils"
 
-	"github.com/chriskaliX/SDK/util/hash"
+	"github.com/chriskaliX/SDK/utils/hash"
 	"k8s.io/utils/lru"
 )
 
@@ -277,7 +277,7 @@ func (e *Event) getPidTree() {
 		}
 		break
 	PidLoop:
-		if pid <= 1 {
+		if pid <= 2 {
 			break
 		}
 		if ppid, ok := pidCache.Get(pid); ok {

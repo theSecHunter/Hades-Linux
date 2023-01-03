@@ -40,4 +40,10 @@ plugins/ebpfdriver/kern/headers/*.h
 
 # windows
 **/*.exe
-plugins/ncp/ncp
+
+# rust-demo
+target
+Cargo.lock
+ncp-rst
+# under work
+SDK/rust/

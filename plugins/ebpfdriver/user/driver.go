@@ -13,7 +13,7 @@ import (
 	"math"
 	"os"
 	"strconv"
-	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/chriskaliX/SDK"
@@ -30,14 +30,7 @@ var _bytecode []byte
 
 // config
 const configMap = "config_map"
-const (
-	confDenyBPF uint32 = 0
-	configSTEXT uint32 = 1
-	configETEXT uint32 = 2
-)
-
-// filters
-const filterPid = "pid_filter"
+const confDenyBPF uint32 = 0
 
 // Task
 const (
@@ -46,12 +39,6 @@ const (
 	TaskWhiteList      = 9
 	TaskEnableDenyBPF  = 10
 	TaskDisableDenyBPF = 11
-)
-
-// Perfmap
-const (
-	execEvents = "exec_events"
-	netEvents  = "net_events"
 )
 
 var rawdata = make(map[string]string, 1)
@@ -64,60 +51,72 @@ type Driver struct {
 	context context.Context
 	cancel  context.CancelFunc
 	cronM   *cron.Cron
-	// driver state monitor
-	filterCount atomic.Value
-	dropCount   atomic.Value
 }
 
 // New a driver with pre-set map and options
 func NewDriver(s SDK.ISandbox) (*Driver, error) {
-	driver := &Driver{
-		Sandbox: s,
-	}
+	driver := &Driver{Sandbox: s}
 	// init ebpfmanager with maps and perf_events
 	driver.Manager = &manager.Manager{
 		PerfMaps: []*manager.PerfMap{
-			{
-				Map: manager.Map{Name: execEvents},
-				PerfMapOptions: manager.PerfMapOptions{
-					PerfRingBufferSize: 256 * os.Getpagesize(),
-					DataHandler:        driver.dataHandler,
-					LostHandler:        driver.lostHandler,
-				},
-			},
+			{Map: manager.Map{Name: "exec_events"}, PerfMapOptions: manager.PerfMapOptions{
+				PerfRingBufferSize: 256 * os.Getpagesize(),
+				DataHandler:        driver.dataHandler,
+				LostHandler:        driver.lostHandler,
+			}},
 			// network events, for now, only honeypot was introduced
-			{
-				Map: manager.Map{Name: netEvents},
-				PerfMapOptions: manager.PerfMapOptions{
-					PerfRingBufferSize: 256 * os.Getpagesize(),
-					DataHandler:        driver.dataHandler,
-					LostHandler:        driver.lostHandler,
-				},
-			},
+			{Map: manager.Map{Name: "net_events"}, PerfMapOptions: manager.PerfMapOptions{
+				PerfRingBufferSize: 256 * os.Getpagesize(),
+				DataHandler:        driver.dataHandler,
+				LostHandler:        driver.lostHandler,
+			}},
 		},
 		Maps: []*manager.Map{
 			{Name: configMap},
-			{Name: filterPid},
+			{Name: "pid_filter", Contents: []ebpf.MapKV{{
+				Key: uint32(os.Getpid()), Value: uint32(0),
+			}}},
 		},
 	}
+
 	for _, event := range decoder.Events {
 		driver.Manager.Probes = append(driver.Manager.Probes, event.GetProbes()...)
 		if event.GetMaps() != nil {
 			driver.Manager.Maps = append(driver.Manager.Maps, event.GetMaps()...)
 		}
 	}
-	err := driver.Manager.InitWithOptions(bytes.NewReader(_bytecode), manager.Options{
-		DefaultKProbeMaxActive: 512,
-		VerifierOptions: ebpf.CollectionOptions{
-			Programs: ebpf.ProgramOptions{
-				LogSize: 1 * 1024 * 1024,
+
+	var stext, etext, pgid uint64
+	// Init options with constant value updated
+	if _stext := utils.Ksyms.Get("_stext"); _stext != nil {
+		stext = _stext.Address
+	}
+	if _etext := utils.Ksyms.Get("_etext"); _etext != nil {
+		etext = _etext.Address
+	}
+	if _pgid, err := syscall.Getpgid(os.Getpid()); err == nil {
+		pgid = uint64(_pgid)
+	}
+
+	err := driver.Manager.InitWithOptions(
+		bytes.NewReader(_bytecode),
+		manager.Options{
+			DefaultKProbeMaxActive: 512,
+			VerifierOptions: ebpf.CollectionOptions{
+				Programs: ebpf.ProgramOptions{LogSize: 1 * 1024 * 1024},
 			},
-		},
-		RLimit: &unix.Rlimit{
-			Cur: math.MaxUint64,
-			Max: math.MaxUint64,
-		},
-	})
+			RLimit: &unix.Rlimit{
+				Cur: math.MaxUint64,
+				Max: math.MaxUint64,
+			},
+			// Init added, be careful that bpf_printk
+			ConstantEditors: []manager.ConstantEditor{
+				{Name: "hades_stext", Value: stext},
+				{Name: "hades_etext", Value: etext},
+				{Name: "hades_pgid", Value: pgid},
+			},
+		})
+
 	driver.context, driver.cancel = context.WithCancel(s.Context())
 	return driver, err
 }
@@ -126,21 +125,6 @@ func (d *Driver) Start() error { return d.Manager.Start() }
 
 // init the driver with default value
 func (d *Driver) PostRun() (err error) {
-	// Get Pid filter
-	if err := d.mapUpdate(filterPid, uint32(os.Getpid()), uint32(0)); err != nil {
-		zap.S().Error(err)
-	}
-	// STEXT ETEXT for rootkit detection
-	if _stext := utils.Ksyms.Get("_stext"); _stext != nil {
-		if err := d.mapUpdate(configMap, configSTEXT, _stext.Address); err != nil {
-			zap.S().Error(err)
-		}
-	}
-	if _etext := utils.Ksyms.Get("_etext"); _etext != nil {
-		if err := d.mapUpdate(configMap, configETEXT, _etext.Address); err != nil {
-			zap.S().Error(err)
-		}
-	}
 	zap.S().Info("ebpfdriver init configuration has been loaded")
 	// By default, we do not ban BPF program unless you choose on this..
 	d.cronM = cron.New(cron.WithSeconds())
@@ -223,7 +207,6 @@ func (d *Driver) taskResolve() {
 func (d *Driver) dataHandler(cpu int, data []byte, perfmap *manager.PerfMap, manager *manager.Manager) {
 	// set into buffer
 	decoder.DefaultDecoder.SetBuffer(data)
-	// variable init
 	var eventDecoder decoder.Event
 	// get and decode the context
 	ctx, err := decoder.DefaultDecoder.DecodeContext()
@@ -232,8 +215,6 @@ func (d *Driver) dataHandler(cpu int, data []byte, perfmap *manager.PerfMap, man
 	}
 	// get the event and set context into event
 	eventDecoder = decoder.Events[ctx.Type]
-	// Fillup the context by the values that Event offers
-	ctx.FillContext(eventDecoder.Name(), eventDecoder.GetExe())
 	// value count
 	if err = eventDecoder.DecodeEvent(decoder.DefaultDecoder); err != nil {
 		if err == decoder.ErrFilter {
@@ -244,6 +225,8 @@ func (d *Driver) dataHandler(cpu int, data []byte, perfmap *manager.PerfMap, man
 		zap.S().Errorf("decode event error: %s", err)
 		return
 	}
+	// Fillup the context by the values that Event offers
+	ctx.FillContext(eventDecoder.Name(), eventDecoder.GetExe())
 	result, err := decoder.MarshalJson(eventDecoder, ctx)
 	if err != nil {
 		zap.S().Error(err)
@@ -257,9 +240,7 @@ func (d *Driver) dataHandler(cpu int, data []byte, perfmap *manager.PerfMap, man
 			Fields: rawdata,
 		},
 	}
-	if err = d.Sandbox.SendRecord(rec); err != nil {
-		zap.S().Error(err)
-	}
+	d.Sandbox.SendRecord(rec)
 }
 
 // lostHandler handles the data for errors

@@ -260,7 +260,7 @@ int sys_enter_prctl(struct _sys_enter_prctl *ctx)
         bpf_probe_read_user_str(&newname, TASK_COMM_LEN, (char *)ctx->arg2);
         save_str_to_buf(&data, &newname, 2);
         break;
-        /*
+    /*
      * Some reference:
      * https://man7.org/linux/man-pages/man2/prctl.2.html
      * https://cloud.tencent.com/developer/article/1040079
@@ -330,7 +330,6 @@ int sys_enter_memfd_create(struct _sys_enter_memfd_create *ctx)
     void *exe = get_exe_from_task(data.task);
     save_str_to_buf(&data, exe, 0);
     save_str_to_buf(&data, (char *)ctx->uname, 1);
-    bpf_printk("%s", ctx->uname);
     save_to_submit_buf(&data, &ctx->flags, sizeof(unsigned int), 2);
     return events_perf_submit(&data);
 }

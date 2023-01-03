@@ -53,6 +53,13 @@ static __always_inline int get_task_pgid(const struct task_struct *cur_task)
 // 在每次调 index 之前都需要 check 一下，所以看源码的时候很多地方会写：To satisfied the verifier...
 // TODO: 写一个文章记录一下这个...
 
+static __always_inline u64 hades_constants_pgid()
+{
+    u64 val = 0;
+    LOAD_CONSTANT("hades_pgid", val);
+    return val;
+}
+
 /* init_context */
 static __always_inline int init_context(context_t *context,
                                         struct task_struct *task)
@@ -100,6 +107,9 @@ static __always_inline int init_context(context_t *context,
 // 0 on false & 1 on true
 static __always_inline int context_filter(context_t *context)
 {
+    // filter by the pgid, all agent and plugins are reliable by default
+    if (context->pgid == (u32)hades_constants_pgid())
+        return 1;
     // ID filter for all
     if (bpf_map_lookup_elem(&pid_filter, &context->tid) != 0)
         return 1;
@@ -263,9 +273,10 @@ static __always_inline void *get_path_str(struct path *path)
             char tmp_inode[9];
             int i, j;
             int k = 0; // when first char is no-zero, it's work
-            int s_flag = 0; // no-zero char start flag
             unsigned long inode = get_inode_nr_from_dentry(dentry);
-
+        #if defined(__TARGET_ARCH_x86)
+            int s_flag = 0; // no-zero char start flag
+        #endif
         #pragma unroll
             for (i = 0; i < 8; i++) {
                 tmp_inode[7 - i] = inode % 10 + '0';
@@ -475,6 +486,13 @@ static __always_inline void *get_dentry_path_str(struct dentry *dentry)
     return &string_p->buf[buf_off];
 }
 
+/* Be careful about inet_rcv_addr & inet_saddr
+ * There are some differences between inet_rcv_addr/inet_saddr and inet_num/inet_sport
+ * For inet_num & inet_sport: inet_sport = hton(inet_num)
+ * For inet_rcv_addr & inet_saddr: 
+ *     inet_rcv_addr: Bound local IPv4 addr
+ *     inet_saddr: Sending source
+ */ 
 static __always_inline int
 get_network_details_from_sock_v4(struct sock *sk, net_conn_v4_t *net_details,
                                  int peer)

@@ -61,6 +61,8 @@ func (d *EbpfDecoder) SetBuffer(_byte []byte) {
 
 func (d *EbpfDecoder) BuffLen() int { return len(d.buffer) }
 
+func (d *EbpfDecoder) GetContext() *Context { return d.eventCtx }
+
 func (d *EbpfDecoder) ReadAmountBytes() int { return d.cursor }
 
 func (d *EbpfDecoder) DecodeContext() (*Context, error) {
@@ -68,7 +70,8 @@ func (d *EbpfDecoder) DecodeContext() (*Context, error) {
 	if len(d.buffer[offset:]) < sizeContext {
 		return nil, fmt.Errorf("can't read context from buffer: buffer too short")
 	}
-	d.eventCtx.Starttime = binary.LittleEndian.Uint64(d.buffer[offset : offset+8])
+	d.eventCtx.StartTime = binary.LittleEndian.Uint64(d.buffer[offset : offset+8])
+	d.eventCtx.StartTime = d.eventCtx.StartTime/1000000000 + bootTime
 	d.eventCtx.CgroupID = binary.LittleEndian.Uint64(d.buffer[offset+8 : offset+16])
 	d.eventCtx.Pns = binary.LittleEndian.Uint32(d.buffer[offset+16 : offset+20])
 	d.eventCtx.Type = binary.LittleEndian.Uint32(d.buffer[offset+20 : offset+24])
