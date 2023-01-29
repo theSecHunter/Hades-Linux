@@ -30,10 +30,13 @@ cert/
 plugins/ebpfdriver/ebpfdriver
 plugins/collector/collector
 plugins/ncp/ncp
+plugins/edr/edr
 
 # libbpf test
-plugins/ebpfdriver/kern/headers/libbpf
 plugins/ebpfdriver/kern/headers/*.h
+plugins/ebpfdriver/kern/headers/libbpf
+plugins/edr/kern/headers/*.h
+plugins/edr/kern/headers/libbpf
 
 # pprof
 *.pprof
@@ -41,9 +44,11 @@ plugins/ebpfdriver/kern/headers/*.h
 # windows
 **/*.exe
 
+# test
+plugins/ebpfdriver/test/dist/*.txt
+
 # rust-demo
 target
 Cargo.lock
 ncp-rst
-# under work
-SDK/rust/
+plugins/ebpfdriver/test/dist/2.txt

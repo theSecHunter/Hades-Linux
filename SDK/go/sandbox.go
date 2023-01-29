@@ -25,7 +25,6 @@ var _ ISandbox = (*Sandbox)(nil)
 
 type ISandbox interface {
 	// Sandbox action
-	Init(sconfig *SandboxConfig) error
 	Run(func(ISandbox) error) error
 	Shutdown()
 	// Sandbox attributes and context
@@ -61,11 +60,8 @@ type SandboxConfig struct {
 	LogConfig *logger.Config
 }
 
-func NewSandbox() *Sandbox {
-	return &Sandbox{}
-}
-
-func (s *Sandbox) Init(sconfig *SandboxConfig) error {
+func NewSandbox(sconfig *SandboxConfig) *Sandbox {
+	s := &Sandbox{}
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.sigs = make(chan os.Signal, 1)
 	s.name = sconfig.Name
@@ -82,9 +78,8 @@ func (s *Sandbox) Init(sconfig *SandboxConfig) error {
 	if !s.Client.IsHooked() && s.Debug() {
 		s.Client.SetSendHook(s.Client.SendDebug)
 	}
-	// Task receiving
 	go s.recvTask()
-	return nil
+	return s
 }
 
 // Run a main function, just a wrapper
@@ -108,12 +103,8 @@ func (s *Sandbox) Run(mfunc func(ISandbox) error) (err error) {
 				return
 			}
 		case <-s.ctx.Done():
-			if s.debug {
-				time.Sleep(5 * time.Second)
-				continue
-			}
-			s.Logger.Info(fmt.Sprintf("cancel received, %s will exit after 5 seconds", s.Name()))
-			<-time.After(5 * time.Second)
+			s.Logger.Info(fmt.Sprintf("cancel received, %s will exit after 1 seconds", s.Name()))
+			<-time.After(1 * time.Second)
 			return nil
 		default:
 			time.Sleep(time.Second)

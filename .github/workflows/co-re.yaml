@@ -28,3 +28,7 @@ jobs:
         run: |
           cd plugins/ebpfdriver
           make core
+      - name: Test
+        run: |
+          cd plugins/ebpfdriver
+          make testing
