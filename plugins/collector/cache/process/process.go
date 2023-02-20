@@ -3,6 +3,7 @@ package process
 import (
 	"bufio"
 	"bytes"
+	"collector/cache"
 	ns "collector/cache/namespace"
 	"collector/utils"
 	"errors"
@@ -18,6 +19,7 @@ type Process struct {
 	Pns      int    `json:"pns"`
 	RootPns  int    `json:"root_pns"`
 	PID      int    `json:"pid"`
+	GID      int    `json:"gid"`
 	PGID     int    `json:"pgid"`
 	PgidArgv string `json:"pgid_argv,omitempty"`
 	TID      int    `json:"tid,omitempty"`
@@ -97,6 +99,10 @@ func (p *Process) GetExe() (err error) {
 func (p *Process) GetCmdline() (err error) {
 	p.Argv, err = getCmdline(p.PID)
 	return
+}
+
+func (p *Process) Fds() (result []string, err error) {
+	return GetFds(p.PID)
 }
 
 // The one and only real function of get cmdline, cache will be filled automatically
@@ -204,6 +210,13 @@ func (p *Process) GetStat(simple bool) (err error) {
 	p.Cpu = (float64((p.Utime + p.Stime + iotime)) / float64(sysTime)) * float64(nproc)
 	p.Cpu, _ = strconv.ParseFloat(fmt.Sprintf("%.6f", p.Cpu), 64)
 	return
+}
+
+func (p *Process) IsContainer() bool {
+	if p.Pns == 0 {
+		return false
+	}
+	return p.Pns != cache.RootPns
 }
 
 func init() {

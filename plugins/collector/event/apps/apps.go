@@ -3,86 +3,111 @@ package apps
 
 import (
 	"collector/cache/process"
-	"collector/eventmanager"
+	"collector/cache/socket"
+	"collector/container"
+	"context"
+	"errors"
+	"os/exec"
 	"strconv"
+	"strings"
+	"syscall"
 	"time"
-
-	"github.com/chriskaliX/SDK"
-	"github.com/chriskaliX/SDK/transport/protocol"
-	"go.uber.org/zap"
 )
 
-const maxProcess = 3000
+var Apps = make([]IApplication, 0)
+
+var (
+	ErrVersionNotFound = errors.New("version not found")
+)
 
 // Just for temporary
 type IApplication interface {
 	Name() string
-	Run(*process.Process) (str string, err error)
-	Match(*process.Process) (bool, error) // Whether the process matches
+	Type() string
+	Version() string
+
+	Run(*process.Process) (m map[string]string, err error)
+	Match(*process.Process) bool // Whether the process matches
 }
 
-var DefaultApplication = &Application{
-	Apps: make(map[string]IApplication),
-}
-
-type Application struct {
-	Apps map[string]IApplication
-}
-
-func (Application) DataType() int { return 1002 }
-
-func (Application) Flag() int { return eventmanager.Periodic }
-
-func (Application) Name() string { return "application" }
-
-// Run over the application recognition plugins
-func (a *Application) Run(s SDK.ISandbox, sig chan struct{}) (err error) {
-	// TODO: Inject the process list into apps to preventing go over the processes list everytime
-	var pids []int
-	pids, err = process.GetPids(maxProcess)
-	if err != nil {
-		return
+// regist the application into slice
+func Regist(app IApplication) {
+	switch app.Type() {
+	case "software":
+		Apps = append([]IApplication{app}, Apps...)
+	default:
+		Apps = append(Apps, app)
 	}
-	for _, pid := range pids {
-		proc, err := process.GetProcessInfo(pid, true)
-		if err != nil {
-			continue
-		}
+}
 
-		// Actual run function for applications, the applications package is differed by its name
-		for k, v := range a.Apps {
-			// Skip if did not match the application
-			if matched, err := v.Match(proc); err != nil || !matched {
+// TODO: container
+func Execute(p *process.Process, args ...string) (result string, err error) {
+	return ExecuteWithName(p, p.Exe, args...)
+}
+
+func ExecuteWithName(p *process.Process, name string, args ...string) (result string, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	// TODO: Safely get the version information from Exec? privileged escalation and evasion may encounter
+	if p.IsContainer() {
+		// In container, we need to execute inside the container, all containers implementation (docker & cri)
+		// should support the Exec arguments
+
+		// cmd := exec.CommandContext(ctx, filepath.Join("/proc", strconv.Itoa(p.PID), "root", name), args...)
+		// cmd.SysProcAttr = &syscall.SysProcAttr{
+		// 	Setpgid:                    true,
+		// 	GidMappingsEnableSetgroups: true,
+		// 	Credential:                 &syscall.Credential{Uid: uint32(p.UID), Gid: uint32(p.GID)},
+		// 	Cloneflags:                 syscall.CLONE_NEWUTS | syscall.CLONE_NEWIPC | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
+		// 	UidMappings:                []syscall.SysProcIDMap{{ContainerID: 0, HostID: os.Getuid(), Size: 1}},
+		// 	GidMappings:                []syscall.SysProcIDMap{{ContainerID: 0, HostID: os.Getgid(), Size: 1}},
+		// }
+		// cmd.Env = os.Environ()
+		// cmd.Dir = filepath.Join("/proc", strconv.Itoa(p.PID), "root", p.Cwd)
+		// var vbytes []byte
+		// vbytes, err = cmd.CombinedOutput()
+		// if err != nil {
+		// 	return result, err
+		// }
+		// result = string(vbytes)
+
+		// Using clients to execute inside the container
+		return container.DefaultClient.Exec(uint32(p.Pns), name, args...)
+	} else {
+		cmd := exec.CommandContext(ctx, name, args...)
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Credential: &syscall.Credential{
+				Uid: uint32(p.UID),
+				Gid: uint32(p.GID),
+			},
+		}
+		cmd.Dir = p.Cwd
+		var vbytes []byte
+		vbytes, err = cmd.CombinedOutput()
+		if err != nil {
+			return result, err
+		}
+		result = string(vbytes)
+	}
+	return
+}
+
+func ProcListenAddrs(proc *process.Process) string {
+	var addrs []string
+	// add listening port if it's an web application
+	if fds, err := proc.Fds(); err == nil {
+		for _, fd := range fds {
+			if !strings.HasPrefix(fd, "socket:[") {
 				continue
 			}
-			// Run with the proc, and get information of what we need
-			if data, err := v.Run(proc); err == nil {
-				// If success, get the container-related fields, the IApplication will not
-				// collect this in it's Run function
-				// Send record
-				s.SendRecord(&protocol.Record{
-					DataType:  int32(a.DataType()),
-					Timestamp: time.Now().Unix(),
-					Data: &protocol.Payload{
-						Fields: map[string]string{
-							"data":           data,
-							"type":           v.Name(),
-							"pid":            strconv.Itoa(proc.PID),
-							"cmdline":        proc.Argv,
-							"pod_name":       proc.PodName,
-							"container_id":   "",
-							"container_name": "",
-							"psm":            "",
-						},
-					},
-				})
-				zap.S().Infof("application collect %s is finished", k)
+			inode, err := strconv.ParseUint(strings.TrimRight(fd[8:], "]"), 10, 32)
+			if err != nil {
+				continue
+			}
+			if soc, ok := socket.Get(uint32(inode)); ok && soc.State == 10 {
+				addrs = append(addrs, soc.SIP.String()+":"+strconv.Itoa(int(soc.SPort)))
 			}
 		}
 	}
-	return nil
-}
-
-func registApp(app IApplication) {
-	DefaultApplication.Apps[app.Name()] = app
+	return strings.Join(addrs, ",")
 }
