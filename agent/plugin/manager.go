@@ -14,17 +14,22 @@ import (
 
 	SDK "github.com/chriskaliX/SDK/transport"
 	"github.com/chriskaliX/SDK/transport/server"
+	"go.uber.org/zap"
 )
 
-var DefaultManager = &Manager{
-	plugins: &sync.Map{},
-	syncCh:  make(chan map[string]*proto.Config, 1),
-}
+var PluginManager = NewManager()
 
 // move to struct, dependency injection
 type Manager struct {
 	plugins *sync.Map
 	syncCh  chan map[string]*proto.Config
+}
+
+func NewManager() *Manager {
+	return &Manager{
+		plugins: &sync.Map{},
+		syncCh:  make(chan map[string]*proto.Config, 1),
+	}
 }
 
 // Get plugin's server side interface
@@ -53,6 +58,7 @@ func (m *Manager) Load(ctx context.Context, cfg proto.Config) (err error) {
 		if plg.Version() == cfg.Version {
 			return nil
 		}
+		zap.S().Infof("start to shutdown plugin %s, version %s", plg.Name(), plg.Version())
 		plg.Shutdown()
 	}
 	if cfg.Signature == "" {
@@ -60,7 +66,7 @@ func (m *Manager) Load(ctx context.Context, cfg proto.Config) (err error) {
 	}
 	plg, err := server.NewServer(ctx, agent.Workdir, &cfg)
 	if err != nil {
-		agent.SetAbnormal(fmt.Sprintf("plugin % starts failed: %s", cfg.Name, err))
+		agent.SetAbnormal(fmt.Sprintf("plugin %s starts failed: %s", cfg.Name, err))
 		return
 	}
 	plg.Wg().Add(3)

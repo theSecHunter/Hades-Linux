@@ -5,6 +5,7 @@ import (
 	"collector/cache/process"
 	"collector/event/apps"
 	"collector/eventmanager"
+	"collector/utils"
 	"strconv"
 	"sync"
 	"time"
@@ -40,6 +41,7 @@ func (Application) Immediately() bool { return false }
 
 // Run over the application recognition plugins
 func (a *Application) Run(s SDK.ISandbox, sig chan struct{}) (err error) {
+	hash := utils.Hash()
 	// inject mapping into application
 	a.once.Do(func() {
 		a.Apps = apps.Apps
@@ -87,6 +89,7 @@ func (a *Application) Run(s SDK.ISandbox, sig chan struct{}) (err error) {
 				"tid":            strconv.Itoa(proc.TID),
 				"pgid":           strconv.Itoa(proc.PGID),
 				"pns":            strconv.Itoa(proc.Pns),
+				"root_pns":       strconv.Itoa(proc.RootPns),
 				"exe":            proc.Exe,
 				"cwd":            proc.Cwd,
 				"version":        v.Version(),
@@ -97,17 +100,18 @@ func (a *Application) Run(s SDK.ISandbox, sig chan struct{}) (err error) {
 				"uid":            strconv.Itoa(int(proc.UID)),
 				"gid":            strconv.Itoa(int(proc.GID)),
 				"username":       proc.Username,
-				"start_time":     strconv.Itoa(int(proc.StartTime)),
+				"start_time":     strconv.FormatUint(proc.StartTime, 10),
 				"listen_addrs":   apps.ProcListenAddrs(proc),
 			})
-
-			s.SendRecord(&protocol.Record{
+			rec := &protocol.Record{
 				DataType:  int32(a.DataType()),
 				Timestamp: time.Now().Unix(),
 				Data: &protocol.Payload{
 					Fields: m,
 				},
-			})
+			}
+			rec.Data.Fields["package_seq"] = hash
+			s.SendRecord(rec)
 			goto Next
 		}
 	Next:
