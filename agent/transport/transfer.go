@@ -117,6 +117,10 @@ func (t *Transfer) Receive(client proto.Transfer_TransferClient) (err error) {
 	if err != nil {
 		return
 	}
+	// precheck cmd
+	if cmd == nil {
+		return
+	}
 	zap.S().Info("command received")
 	atomic.AddUint64(&t.rxCnt, 1)
 	// resolve task & config
@@ -137,7 +141,7 @@ func (t *Transfer) GetState(now time.Time) (txTPS, rxTPS float64) {
 }
 
 func (t *Transfer) resolveConfig(cmd *proto.Command) (err error) {
-	if cmd == nil || cmd.Configs == nil {
+	if cmd.Configs == nil {
 		return
 	}
 	configs := map[string]*proto.Config{}
@@ -145,14 +149,14 @@ func (t *Transfer) resolveConfig(cmd *proto.Command) (err error) {
 		configs[config.Name] = config
 	}
 	if config, ok := configs[agent.Product]; ok && config.Version != agent.Version {
-		zap.S().Infof("agent will update:current version %v -> expected version %v", agent.Version, config.Version)
+		zap.S().Infof("agent will update from version %v to version %v", agent.Version, config.Version)
 		if err = agent.Update(*config); err == nil {
 			zap.S().Info("agent update successfully")
 			agent.Cancel()
 			return
 		}
 		zap.S().Error("agent update failed:", err)
-		agent.SetAbnormal(fmt.Sprintf("agent update failed: %s", err))
+		agent.SetAbnormal(fmt.Sprintf("agent update failed: %s", err.Error()))
 	}
 	delete(configs, agent.Product)
 	PluginConfigChan <- configs
@@ -160,8 +164,7 @@ func (t *Transfer) resolveConfig(cmd *proto.Command) (err error) {
 }
 
 func (t *Transfer) resolveTask(cmd *proto.Command) (err error) {
-	// resolve task by it's name
-	if cmd == nil || cmd.Task == nil {
+	if cmd.Task == nil {
 		return
 	}
 	switch cmd.Task.ObjectName {
@@ -175,7 +178,7 @@ func (t *Transfer) resolveTask(cmd *proto.Command) (err error) {
 		case config.TaskSetenv:
 		case config.TaskRestart:
 		default:
-			zap.S().Error("resolveTask Agent DataType not supported: ", cmd.Task.DataType)
+			zap.S().Errorf("agent datatype %d is not supported", cmd.Task.DataType)
 			return ErrAgentDataType
 		}
 	// send to plugin channel

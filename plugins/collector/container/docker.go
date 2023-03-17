@@ -15,7 +15,7 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
-const dockerLimit = 2048
+const dockerLimit = 3000
 
 type docker struct {
 	c *client.Client
@@ -43,7 +43,8 @@ func (c *docker) Containers(ctx context.Context) ([]Container, error) {
 	for _, container := range containers {
 		var name string
 		if len(container.Names) > 0 {
-			name = container.Names[0]
+			// docker may starts with prefix "/"
+			name = strings.TrimPrefix(container.Names[0], "/")
 		}
 		label, _ := sonic.MarshalString(container.Labels)
 		c := Container{
@@ -57,21 +58,18 @@ func (c *docker) Containers(ctx context.Context) ([]Container, error) {
 			Labels:    label,
 		}
 		time.Sleep(50 * time.Millisecond)
-		// Inspect into the container
-		json, err := cli.ContainerInspect(ctx, container.ID)
-		if err != nil {
-			goto Next
-		}
-		if json.State.Pid == 0 {
-			goto Next
-		}
-		c.PID = strconv.FormatInt(int64(json.State.Pid), 10)
-		p = process.Process{PID: int(json.State.Pid)}
-		if err := p.GetNs(); err == nil {
-			c.Pns = strconv.FormatInt(int64(p.Pns), 10)
+		// inspect into the container
+		if json, err := cli.ContainerInspect(ctx, container.ID); err == nil {
+			// the container is running
+			if json.State.Pid != 0 {
+				c.PID = strconv.FormatInt(int64(json.State.Pid), 10)
+				p = process.Process{PID: int(json.State.Pid)}
+				if err := p.GetNs(); err == nil {
+					c.Pns = strconv.FormatInt(int64(p.Pns), 10)
+				}
+			}
 		}
 		cs = append(cs, c)
-	Next:
 	}
 	return cs, nil
 }

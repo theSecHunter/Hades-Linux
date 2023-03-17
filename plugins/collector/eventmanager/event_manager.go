@@ -43,29 +43,25 @@ func (e *EventManager) AddEvent(event IEvent, t time.Duration) {
 	e.m[event.DataType()].done <- struct{}{}
 }
 
-func (e *EventManager) Run(s SDK.ISandbox) error {
-	zap.S().Info("eventmanager running")
-	// Run the immediately firstly
+// schedule the events
+func (e *EventManager) Schedule(s SDK.ISandbox) error {
+	// run and wait the immdiately firstly and skip the trigger mode
 	for _, event := range e.m {
-		if event.event.Immediately() {
+		if event.event.Immediately() && event.event.Flag() != Trigger {
 			zap.S().Infof("%s first run", event.event.Name())
 			event.Start(s)
 		}
 	}
-	// Start the goroutines
+	// start the events
 	for _, event := range e.m {
 		switch event.event.Flag() {
 		case Realtime:
 			go event.Start(s)
 		case Periodic:
 			go func(ev *Event) {
+				// immediately already run
 				if !ev.event.Immediately() {
-					var rint = 600
-					if s.Debug() {
-						rint = 10
-					}
-					r := rand.Intn(rint)
-					time.Sleep(time.Duration(r) * time.Second)
+					time.Sleep(e.random(s.Debug()))
 					zap.S().Infof("%s first run", ev.event.Name())
 					ev.Start(s)
 				}
@@ -76,7 +72,7 @@ func (e *EventManager) Run(s SDK.ISandbox) error {
 				ev.id = id
 			}(event)
 		case Trigger:
-			// just ignore this
+			zap.S().Infof("%s start in trigger mode", event.event.Name())
 		}
 	}
 	go e.taskResolve()
@@ -84,8 +80,17 @@ func (e *EventManager) Run(s SDK.ISandbox) error {
 	return nil
 }
 
-// collector task resolve
-// only data_type and (an int interval)
+func (e *EventManager) random(debug bool) time.Duration {
+	var rint int
+	if debug {
+		rint = rand.Intn(10)
+	} else {
+		rint = rand.Intn(600)
+	}
+	return time.Duration(rint) * time.Second
+}
+
+// collector task resolve, only data_type and (an int interval)
 func (e *EventManager) taskResolve() {
 	for {
 		task := e.s.RecvTask()
@@ -105,7 +110,7 @@ func (e *EventManager) taskResolve() {
 			Timestamp: time.Now().Unix(),
 			Data: &protocol.Payload{
 				Fields: map[string]string{
-					"status": "successed",
+					"status": "success",
 					"msg":    "",
 					"token":  task.Token,
 				},
@@ -150,9 +155,9 @@ func (e *EventManager) taskResolve() {
 			}
 			if err := event.Stop(e.cron); err != nil {
 				serr := fmt.Sprintf("%s stop fail", event.event.Name())
-				zap.S().Error(serr)
+				zap.S().Errorf(serr)
 				data.Data.Fields = map[string]string{
-					"status": "failed",
+					"status": "fail",
 					"msg":    serr,
 				}
 			}
