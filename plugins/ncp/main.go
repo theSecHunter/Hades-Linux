@@ -35,7 +35,7 @@ func main() {
 	go func() {
 		for {
 			select {
-			case <-sandbox.Context().Done():
+			case <-sandbox.Done():
 			default:
 				task := sandbox.RecvTask()
 				switch task.DataType {
@@ -70,5 +70,5 @@ func main() {
 		}
 	}()
 
-	sandbox.Run(ncp.Run)
+	sandbox.Run(ncp.Start)
 }

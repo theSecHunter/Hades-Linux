@@ -46,8 +46,7 @@ type Event struct {
 	SSHConnection string `json:"ssh_connection"`
 	LdPreload     string `json:"ld_preload"`
 	LdLibrary     string `json:"ld_library"`
-	StartTime     uint64 `json:"starttime"`
-	CgroupID      uint64 `json:"cgroupid"`
+	StartTime     uint64 `json:"start_time"`
 	Pns           uint32 `json:"pns"`
 	RootPns       uint32 `json:"root_pns"`
 	Pid           uint32 `json:"pid"`
@@ -100,15 +99,14 @@ func (e *Event) GetInfo() (err error) {
 	if err = e.getUserName(); err != nil {
 		return
 	}
-	if e.PgidArgv, err = getArgv(e.Pgid); err != nil {
-		return
-	}
 	if e.PComm, err = getComm(e.Ppid); err != nil {
 		return
 	}
 	if e.PpidArgv, err = getArgv(e.Ppid); err != nil {
 		return
 	}
+	// ignore the error of pgid
+	e.PgidArgv, _ = getArgv(e.Pgid)
 	e.Stdin, _ = e.getFd(0)
 	e.Stdout, _ = e.getFd(1)
 	e.getPidTree()
@@ -120,7 +118,7 @@ func (e *Event) Reset() {
 	e.Comm, e.Cwd = defaultValue, defaultValue
 	e.Stdin, e.Stdout, e.Argv = defaultValue, defaultValue, defaultValue
 	e.SSHConnection, e.LdPreload, e.LdLibrary = defaultValue, defaultValue, defaultValue
-	e.StartTime, e.CgroupID, e.Pns, e.Pid, e.Tid, e.Uid, e.Gid = 0, 0, 0, 0, 0, -1, -1
+	e.StartTime, e.Pns, e.Pid, e.Tid, e.Uid, e.Gid = 0, 0, 0, 0, -1, -1
 	e.Ppid, e.Pgid, e.SessionID, e.TTY = 0, 0, 0, 0
 	e.Comm, e.PComm, e.ExeHash, e.Username = defaultValue, defaultValue, defaultValue, defaultValue
 	e.Exe, e.PpidArgv, e.PgidArgv, e.PodName = defaultValue, defaultValue, defaultValue, defaultValue
@@ -193,22 +191,24 @@ func (e *Event) getEnviron() (err error) {
 		e.PodName = value.(string)
 	}
 	envs := bytes.Split(source, []byte{0})
-	for env := range envs {
-		_env := strings.Split(fmt.Sprint(env), "=")
+	for _, env := range envs {
+		_env := bytes.Split(env, []byte{'='})
 		if len(_env) != 2 {
 			continue
 		}
-		if len(e.SSHConnection) <= 2 && _env[0] == "SSH_CONNECTION" {
-			e.SSHConnection = _env[1]
-		} else if len(e.LdPreload) <= 2 && _env[0] == "LD_PRELOAD" {
-			e.LdPreload = _env[1]
-		} else if len(e.PodName) <= 2 && (_env[0] == "POD_NAME" || _env[0] == "MY_POD_NAME") {
-			e.PodName = _env[1]
+		key := string(_env[0])
+		value := string(_env[1])
+		if len(e.SSHConnection) <= 2 && key == "SSH_CONNECTION" {
+			e.SSHConnection = value
+		} else if len(e.LdPreload) <= 2 && key == "LD_PRELOAD" {
+			e.LdPreload = value
+		} else if len(e.PodName) <= 2 && (key == "POD_NAME" || key == "MY_POD_NAME") {
+			e.PodName = value
 			if e.Pns != 0 {
 				nsCache.Add(e.Pns, e.PodName)
 			}
-		} else if _env[0] == "LD_LIBRARY" {
-			e.LdLibrary = _env[1]
+		} else if key == "LD_LIBRARY" {
+			e.LdLibrary = value
 		}
 	}
 	return
@@ -309,6 +309,10 @@ func (e *Event) getPidTree() {
 }
 
 func getArgv(pid uint32) (argv string, err error) {
+	if pid == 1<<32-1 {
+		argv = "-1"
+		return
+	}
 	if value, ok := argvCache.Get(pid); ok {
 		argv = value.(string)
 	}

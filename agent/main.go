@@ -58,7 +58,7 @@ func main() {
 		Filename:   "log/hades.log",
 		MaxSize:    1,
 		MaxBackups: 10,
-		MaxAge:     10,   //days
+		MaxAge:     10,   // days
 		Compress:   true, // disabled by default
 	})
 	core := zapcore.NewTee(
@@ -71,7 +71,7 @@ func main() {
 	if os.Getenv("service_type") == "sysvinit" {
 		l, _ := lockfile.New("/var/run/hades-agent.pid")
 		if err := l.TryLock(); err != nil {
-			zap.S().Error(err)
+			zap.S().Errorf("lockfile failed: %s", err.Error())
 			return
 		}
 	}
@@ -89,10 +89,11 @@ func main() {
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, syscall.SIGTERM)
 		sig := <-sigs
-		zap.S().Error("receive signal:", sig.String())
-		zap.S().Info("wait for 5 secs to exit")
-		<-time.After(time.Second * 5)
+		zap.S().Errorf("receive signal: %s", sig.String())
+		zap.S().Info("wait for 3 secs to exit")
+		<-time.After(time.Second * 3)
 		agent.Cancel()
 	}()
 	wg.Wait()
+	zap.S().Info("agent is stop")
 }
