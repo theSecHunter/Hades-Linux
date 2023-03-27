@@ -18,47 +18,46 @@ import (
 )
 
 var PluginManager = NewManager()
-var ErrIngore = errors.New("ignore")
+var ErrIgnore = errors.New("ignore")
 
-// move to struct, dependency injection
 type Manager struct {
-	plugins *sync.Map
-	syncCh  chan map[string]*proto.Config
+	// plugins cache available SDK.IServer, key is plugin name
+	plugins map[string]SDK.IServer
+	mu      sync.Mutex
 }
 
 func NewManager() *Manager {
-	return &Manager{
-		plugins: &sync.Map{},
-		syncCh:  make(chan map[string]*proto.Config, 1),
-	}
+	return &Manager{plugins: make(map[string]SDK.IServer)}
 }
 
 // Get plugin's server side interface
-func (m *Manager) Get(name string) (SDK.IServer, bool) {
-	if plg, ok := m.plugins.Load(name); ok {
-		return plg.(SDK.IServer), ok
-	}
-	return nil, false
+func (pm *Manager) Get(name string) (SDK.IServer, bool) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	p, ok := pm.plugins[name]
+	return p, ok
 }
 
 // GetAll returns all plugin interfaces
-func (m *Manager) GetAll() (plgs []SDK.IServer) {
-	m.plugins.Range(func(_, value any) bool {
-		plg := value.(SDK.IServer)
-		plgs = append(plgs, plg)
-		return true
-	})
-	return
+func (pm *Manager) GetAll() (plgs []SDK.IServer) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	plgs = make([]SDK.IServer, 0, len(pm.plugins))
+	for _, p := range pm.plugins {
+		plgs = append(plgs, p)
+	}
+	return plgs
 }
 
 // Load plugin from proto.Config which has already checked
 // in Download and CheckSignature function, the real plugin
 // and server has already packaged into SDK
 func (m *Manager) Load(ctx context.Context, cfg proto.Config) (err error) {
+	// configuration pre check
 	if plg, ok := m.Get(cfg.Name); ok && !plg.IsExited() {
 		if plg.Version() == cfg.Version {
 			// ignore this if already started
-			return ErrIngore
+			return ErrIgnore
 		}
 		zap.S().Infof("start to shutdown plugin %s, version %s", plg.Name(), plg.Version())
 		plg.Shutdown()
@@ -66,59 +65,42 @@ func (m *Manager) Load(ctx context.Context, cfg proto.Config) (err error) {
 	if cfg.Signature == "" {
 		cfg.Signature = cfg.Sha256
 	}
+	// plugin pre check
 	plg, err := server.NewServer(ctx, agent.Workdir, &cfg)
 	if err != nil {
-		agent.SetAbnormal(fmt.Sprintf("plugin %s starts failed: %s", cfg.Name, err))
+		err = fmt.Errorf("plugin %s starts failed: %s", cfg.Name, err)
+		zap.S().Error(err.Error())
+		agent.SetAbnormal(err.Error())
 		return
 	}
+	// start plugin goroutine
 	plg.Wg().Add(3)
 	go plg.Wait()
-	go plg.Receive(pool.SDKGet, transport.DefaultTrans)
+	go plg.Receive(pool.SDKGet, transport.Trans)
 	go plg.Task()
-	m.Register(plg.Name(), plg)
+	m.regist(plg.Name(), plg)
 	return nil
 }
 
-func (m *Manager) Sync(cfgs map[string]*proto.Config) (err error) {
-	select {
-	case m.syncCh <- cfgs:
-	default:
-		err = errors.New("plugins are syncing or context has been cancled")
-	}
-	return
+func (pm *Manager) regist(name string, plg SDK.IServer) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	pm.plugins[name] = plg
 }
 
-func (m *Manager) Register(name string, plg SDK.IServer) {
-	m.plugins.Store(name, plg)
-}
+func (pm *Manager) unRegist(name string) (err error) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
 
-func (m *Manager) UnRegister(name string) (err error) {
-	plg, ok := m.Get(name)
+	plg, ok := pm.plugins[name]
 	if !ok {
-		err = fmt.Errorf("%s is not available", name)
-		return
+		return fmt.Errorf("plugin %s not found", name)
 	}
 	plg.Shutdown()
-	m.plugins.Delete(name)
+	delete(pm.plugins, name)
 	if err = os.RemoveAll(plg.GetWorkingDirectory()); err != nil {
 		agent.SetAbnormal(fmt.Sprintf("%s remove work dir failed: %s", name, err.Error()))
 		return
 	}
 	return
-}
-
-func (m *Manager) UnregisterAll() {
-	subWg := &sync.WaitGroup{}
-	m.plugins.Range(func(_, value any) bool {
-		subWg.Add(1)
-		plg := value.(SDK.IServer)
-		go func() {
-			defer subWg.Done()
-			plg.Shutdown()
-			plg.Wg().Wait()
-			m.plugins.Delete(plg.Name())
-		}()
-		return true
-	})
-	subWg.Wait()
 }

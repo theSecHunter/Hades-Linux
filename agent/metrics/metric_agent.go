@@ -29,7 +29,7 @@ var (
 	cpuLogicalNum   int
 	cpuMhz          string
 	cpuName         string
-	Memory          uint64
+	memory          uint64
 
 	bootTime uint64
 )
@@ -51,7 +51,7 @@ func init() {
 	cpuMhz = strconv.FormatFloat(mhz/1000, 'f', 1, 64)
 
 	if m, err := mem.VirtualMemory(); err == nil {
-		Memory = m.Total
+		memory = m.Total
 	}
 	bootTime, _ = host.BootTime()
 	arch, _ = host.KernelArch()
@@ -115,7 +115,7 @@ func (m *AgentMetric) Flush(now time.Time) {
 	m.CpuLogicalNum = strconv.Itoa(cpuLogicalNum)
 	m.CpuMhz = cpuMhz
 	m.CpuName = cpuName
-	m.TotalMemory = strconv.FormatUint(Memory, 10)
+	m.TotalMemory = strconv.FormatUint(memory, 10)
 	m.BootTime = strconv.FormatUint(bootTime, 10)
 
 	pid := os.Getpid()
@@ -134,7 +134,7 @@ func (m *AgentMetric) Flush(now time.Time) {
 	s := connection.DefaultStatsHandler.GetStats(now)
 	m.RxSpeed = strconv.FormatFloat(s.RxSpeed, 'f', 8, 64)
 	m.TxSpeed = strconv.FormatFloat(s.TxSpeed, 'f', 8, 64)
-	txTPS, rxTPX := transport.DefaultTrans.GetState(now)
+	txTPS, rxTPX := transport.Trans.GetState(now)
 	m.TxTps = strconv.FormatFloat(txTPS, 'f', 8, 64)
 	m.RxTps = strconv.FormatFloat(rxTPX, 'f', 8, 64)
 	m.Du = strconv.FormatUint(getDirSize(agent.Workdir, "plugin"), 10) // get only from plugin
@@ -155,8 +155,8 @@ func (m *AgentMetric) Flush(now time.Time) {
 			m.Load5 = strconv.FormatFloat(avg.Load5, 'f', 2, 64)
 			m.Load15 = strconv.FormatFloat(avg.Load15, 'f', 2, 64)
 		}
-		// daemon.SdNotify(false, "WATCHDOG=1")
 	}
+
 	rec := &proto.Record{
 		DataType:  config.DTAgentStatus,
 		Timestamp: now.Unix(),
@@ -165,5 +165,5 @@ func (m *AgentMetric) Flush(now time.Time) {
 		},
 	}
 	mapstructure.Decode(m, &rec.Data.Fields)
-	transport.DefaultTrans.Transmission(rec, false)
+	transport.Trans.Transmission(rec, false)
 }

@@ -43,16 +43,16 @@ func (h *PluginMetric) Init() bool {
 
 func (m *PluginMetric) Flush(now time.Time) {
 	plgs := plugin.PluginManager.GetAll()
+	rec := &proto.Record{
+		DataType:  config.DTPluginStatus,
+		Timestamp: now.Unix(),
+		Data: &proto.Payload{
+			Fields: map[string]string{},
+		},
+	}
 	// send an empty packet if there is no plugin
 	if len(plgs) == 0 {
-		rec := &proto.Record{
-			DataType:  config.DTPluginStatus,
-			Timestamp: now.Unix(),
-			Data: &proto.Payload{
-				Fields: map[string]string{},
-			},
-		}
-		transport.DefaultTrans.Transmission(rec, false)
+		transport.Trans.Transmission(rec, false)
 		return
 	}
 	for _, plg := range plgs {
@@ -82,14 +82,9 @@ func (m *PluginMetric) Flush(now time.Time) {
 
 		fields := make(map[string]string, 20)
 		if err := mapstructure.Decode(m, &fields); err == nil {
-			rec := &proto.Record{
-				DataType:  config.DTPluginStatus,
-				Timestamp: now.Unix(),
-				Data: &proto.Payload{
-					Fields: fields,
-				},
-			}
-			transport.DefaultTrans.Transmission(rec, false)
+			rec.Timestamp = now.Unix()
+			rec.Data.Fields = fields
+			transport.Trans.Transmission(rec, false)
 		}
 	}
 }
