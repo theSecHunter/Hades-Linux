@@ -138,7 +138,9 @@ func NewDriver(s SDK.ISandbox) (*Driver, error) {
 		manager.Options{
 			DefaultKProbeMaxActive: 512,
 			VerifierOptions: ebpf.CollectionOptions{
-				Programs: ebpf.ProgramOptions{LogSize: 1 * 1024 * 1024},
+				Programs: ebpf.ProgramOptions{
+					LogSize: 1 * 1024 * 1024,
+				},
 			},
 			RLimit: &unix.Rlimit{
 				Cur: math.MaxUint64,
@@ -166,7 +168,7 @@ func (d *Driver) Start() error {
 
 // init the driver with default value
 func (d *Driver) PostRun() (err error) {
-	zap.S().Info("ebpfdriver init configuration has been loaded")
+	zap.S().Info("edriver init configuration has been loaded")
 	// By default, we do not ban BPF program unless you choose on this..
 	d.cronM = cron.New(cron.WithSeconds())
 	// Regist the cronjobs of the event
@@ -317,7 +319,7 @@ func (d *Driver) mapUpdate(name string, key uint32, value interface{}) error {
 // and download the bytecode to override the embeded bytecode.
 func downloadBytecode() (driverName string, err error) {
 	// TODO: load driver bytecode dynamiclly by downloading, make the
-	// sha256 of ebpfdriver userspace stay the same
+	// sha256 of edriver userspace stay the same
 	//
 	// By default, if BTF is enabled, use CORE version driver
 	var driverType string
