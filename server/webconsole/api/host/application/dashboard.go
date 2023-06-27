@@ -73,7 +73,7 @@ func Dashboard(c *gin.Context) {
 		return
 	}
 	resp.CrontabCount = crontabCount
-	kmodCount, err := getCount(bson.M{"data_type": 2001})
+	kmodCount, err := getCount(bson.M{"data_type": 3009})
 	if err != nil {
 		common.Response(c, common.ErrorCode, err.Error())
 		return
@@ -163,7 +163,7 @@ func Dashboard(c *gin.Context) {
 			primitive.E{Key: "total", Value: bson.D{primitive.E{Key: "$sum", Value: 1}}},
 		}}},
 		bson.D{primitive.E{Key: "$sort", Value: bson.D{primitive.E{Key: "total", Value: -1}}}},
-		bson.D{primitive.E{Key: "$limit", Value: 6}},
+		bson.D{primitive.E{Key: "$limit", Value: 5}},
 	}
 	cur, err = mongo.MongoProxyImpl.AssetC.Aggregate(ctx, appPipeline)
 	if err != nil {
@@ -184,7 +184,7 @@ func Dashboard(c *gin.Context) {
 }
 
 func getCount(filter bson.M) (int64, error) {
-	filter["update_time"] = bson.M{"$gt": time.Now().Unix() - 60*60*24}
+	filter["update_time"] = bson.M{"$gt": time.Now().Unix() - 60*60*24*3}
 	var max int64 = countLimit
 	opts := &options.CountOptions{
 		Limit: &max,

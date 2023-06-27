@@ -6,15 +6,15 @@ import (
 	"strconv"
 )
 
-type SystemdUnit struct{}
+type Bpf struct{}
 
-var _ Event = (*SystemdUnit)(nil)
+var _ Event = (*Bpf)(nil)
 
-func (c *SystemdUnit) ID() int32 { return 3011 }
+func (c *Bpf) ID() int32 { return 3014 }
 
-func (c *SystemdUnit) Name() string { return "systemd_unit" }
+func (c *Bpf) Name() string { return "bpf" }
 
-func (c *SystemdUnit) Handle(m map[string]string, req *pb.RawData, conn *pool.Connection) error {
+func (c *Bpf) Handle(m map[string]string, req *pb.RawData, conn *pool.Connection) error {
 	mapper := make(map[string]interface{})
 	// handle the data
 	for k, v := range m {
@@ -30,4 +30,4 @@ func (c *SystemdUnit) Handle(m map[string]string, req *pb.RawData, conn *pool.Co
 	return nil
 }
 
-func init() { RegistEvent(&SystemdUnit{}) }
+func init() { RegistEvent(&Bpf{}) }
