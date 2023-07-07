@@ -1,4 +1,4 @@
- /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
+/* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
@@ -21,6 +21,8 @@
 #define ACTION_LOG      1
 #define PROTOCOL_ALL    0
 
+#define MAX_PORT_ARR    32
+
 // send out the perf event
 struct {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
@@ -36,6 +38,8 @@ struct policy_key {
 struct policy_value {
     __u32   action;
     __u32   protocol;
+    __u16   ports[MAX_PORT_ARR];       // 32
+    __u16   ports_range[MAX_PORT_ARR]; // 16 range only
 };
 
 // Dump the skeleton
@@ -49,6 +53,39 @@ struct {
     __uint(map_flags, BPF_F_NO_PREALLOC);
     __uint(max_entries, EGRESS_POLICY_MAP_SIZE);
 } EGRESS_POLICY_MAP SEC(".maps");
+
+// check the port
+// true: matched
+// false: not matched
+static __always_inline bool
+port_check(struct policy_value *policy, __u16 port)
+{
+    int empty = false;
+#pragma unroll
+    for (int i = 0; i < MAX_PORT_ARR; i++) {
+        // if the port not set, return true;
+        if (policy->ports[i] == 0) {
+            // if empty, means match all
+            if (i == 0)
+                empty = true;
+            break;
+        }
+        if (policy->ports[i] == port) {
+            return true;
+        }
+    }
+#pragma unroll
+    for (int i = 0; i < MAX_PORT_ARR; i+=2) {
+        if (policy->ports_range[i] == 0 || policy->ports_range[i+1] == 0) {
+            if (i == 0)
+                return empty;
+            return false;
+        }
+        if (policy->ports_range[i] <= bpf_ntohs(port) && policy->ports_range[i+1] >= bpf_ntohs(port))
+            return true;
+    }
+    return false;
+}
 
 static __always_inline bool
 skb_revalidate_data(struct __sk_buff *skb, uint8_t **head, uint8_t **tail, const u32 offset)
@@ -73,6 +110,7 @@ typedef struct net_packet {
     struct in6_addr src_addr, dst_addr;
     __be16 src_port, dst_port;
     u8 protocol;
+    u8 action;
 } net_packet_t;
 
 // Dump the skeleton
@@ -99,8 +137,9 @@ static __always_inline int tc_probe(struct __sk_buff *skb, int ingress)
     pkt.ts = bpf_ktime_get_ns();
     pkt.len = skb->len;
     pkt.ifindex = skb->ifindex;
-    uint32_t l4_hdr_off;
+    pkt.action = ACTION_LOG;
 
+    uint32_t l4_hdr_off;
     // getting iphdr, keep protocol and sip and dip
     if (eth->h_proto == bpf_htons(ETH_P_IP)) {
         l4_hdr_off = sizeof(struct ethhdr) + sizeof(struct iphdr);
@@ -141,26 +180,43 @@ static __always_inline int tc_probe(struct __sk_buff *skb, int ingress)
             pkt.src_port = udp->source;
             pkt.dst_port = udp->dest;
     }
-    // fill up the key
-    struct policy_key key = { 
-        .prefixlen = 128,
-        .addr = pkt.dst_addr
-    };
 
-    struct policy_value *value = bpf_map_lookup_elem(&EGRESS_POLICY_MAP, &key);
-    if (value) {
-        size_t pkt_size = sizeof(pkt);
-        // protocol match
-        if (value->protocol != PROTOCOL_ALL && value->protocol != pkt.protocol) {
-            return TC_ACT_UNSPEC;
+    // egress
+    if(ingress == false) {
+        // fill up the key
+        struct policy_key key = { 
+            .prefixlen = 128,
+            .addr = pkt.dst_addr
+        };
+
+        // counter in kernel space
+        struct policy_value *value = bpf_map_lookup_elem(&EGRESS_POLICY_MAP, &key);
+        if (value) {
+            size_t pkt_size = sizeof(pkt);
+            // protocol match, port is ignored
+            if (value->protocol != PROTOCOL_ALL && value->protocol != pkt.protocol) {
+                return TC_ACT_UNSPEC;
+            }
+
+            // for now, only support udp & tcp
+            if (pkt.protocol == IPPROTO_TCP || pkt.protocol == IPPROTO_UDP) {
+                if (port_check(value, pkt.dst_port) == false) {
+                    return TC_ACT_UNSPEC;
+                }
+            }
+
+            if (value->action == ACTION_DENY) {
+                pkt.action = ACTION_DENY;
+                bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, &pkt, pkt_size);
+                return TC_ACT_SHOT;
+            } else {
+                bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, &pkt, pkt_size);
+            }
         }
-
-        bpf_perf_event_output(skb, &events, BPF_F_CURRENT_CPU, &pkt, pkt_size);
-        if (value->action == ACTION_DENY) {
-            return TC_ACT_SHOT;
-        }       
+    // ingress
+    } else {
+        // scan detection
     }
 
     return TC_ACT_UNSPEC;
 };
-

@@ -18,8 +18,8 @@ mod manager;
 use crate::manager::manager::Bpfmanager;
 
 fn main() {
-    let mut client = Client::new(true);
-    let logger = Logger::new(Config {
+    let mut client = Client::new(false);
+    set_boxed_logger(Box::new(Logger::new(Config {
         max_size: 1024 * 1024 * 5,
         path: PathBuf::from("./eguard.log"),
         #[cfg(not(feature = "debug"))]
@@ -30,8 +30,8 @@ fn main() {
         max_backups: 10,
         compress: true,
         client: Some(client.clone()),
-    });
-    set_boxed_logger(Box::new(logger)).unwrap();
+    }))).unwrap();
+    
     // Install Ctrl-C handler
     let control_s = Arc::new(AtomicBool::new(false));
     let control_l = control_s.clone();
@@ -39,13 +39,13 @@ fn main() {
     ctrlc::set_handler(move || {
         control_c.store(true, Ordering::Relaxed);
     }).unwrap();
+
     // set channel and replace
     let (tx, rx) = bounded(512);
-    // *event::event::TX.lock().unwrap() = Some(tx);
     {
-        let mut lock = event::event::TX
-          .lock()
-          .map_err(|e| error!("failed to define shared notification sender: {}", e)).unwrap();
+        let mut lock = event::event::TX.lock()
+            .map_err(|e| error!("failed to define shared notification sender: {}", e))
+            .unwrap();
         *lock = Some(tx);
     }
 
@@ -53,10 +53,11 @@ fn main() {
     Bpfmanager::bump_memlock_rlimit().unwrap();
     let mut mgr = Bpfmanager::new();
     let mut event = TcEvent::new();
-    event.set_if("eth0").unwrap(); // debug
+    // debug
+    event.set_if("eth0").unwrap();
     mgr.load_program("tc", Box::new(event));
     if let Err(e) = mgr.start_program("tc") {
-        error!("{}", e);
+        error!("start tc failed: {}", e);
         return;
     }
     info!("init bpf program successfully");
@@ -70,7 +71,7 @@ fn main() {
                     // handle task
                 }
                 Err(e) => {
-                    error!("when receiving task,an error occurred:{}", e);
+                    error!("when receiving task, an error occurred:{}", e);
                     control_s.store(true, Ordering::Relaxed);
                     return;
                 }
@@ -98,6 +99,7 @@ fn main() {
             }
         }).unwrap();
     let _ = record_send.join();
+    info!("record_send is exiting");
     mgr.stop_program("tc").unwrap();
     info!("plugin will exit");
 }
