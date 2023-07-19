@@ -3,6 +3,7 @@ mod eguard_skel {
 }
 use crate::config::config::*;
 use crate::config::ip_config::IpConfig;
+use libbpf_rs::skel::{SkelBuilder, OpenSkel};
 use log::*;
 use sdk::{Record, Payload};
 use coarsetime::Clock;
@@ -13,19 +14,21 @@ use super::BpfProgram;
 use anyhow::{bail, Context, Result};
 use core::time::Duration;
 use std::collections::HashMap;
+use std::os::fd::AsFd;
 use eguard_skel::*;
 use libbpf_rs::{MapFlags, PerfBufferBuilder, TcHook, TcHookBuilder, TC_EGRESS};
 use libc::{IPPROTO_TCP, IPPROTO_UDP};
 use plain::Plain;
-use std::fs;
 use std::net::Ipv6Addr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, spawn};
 
+#[cfg(feature = "debug")]
+use std::fs;
+
 #[derive(Default)]
 pub struct TcEvent<'a> {
-    fd: i32,
     if_name: String,
     if_idx: i32,
     skel: Option<EguardSkel<'a>>, // skel and hook
@@ -107,7 +110,6 @@ impl<'a> TcEvent<'a> {
                 }
             }            
         }
-
 
         // flush to the map
         let value = unsafe { plain::as_bytes(&value) };
@@ -201,10 +203,8 @@ impl<'a> BpfProgram for TcEvent<'a> {
         let skel = self.skel.as_mut().expect("Failed to initialize skel");
 
         // generate the tc hook
-        self.fd = skel.progs().hades_egress().fd();
         self.tchook = Some(
-            TcHookBuilder::new()
-                .fd(self.fd.clone())
+            TcHookBuilder::new(skel.progs().hades_egress().as_fd())
                 .ifindex(self.if_idx.clone())
                 .replace(true)
                 .handle(1)
@@ -231,6 +231,7 @@ impl<'a> BpfProgram for TcEvent<'a> {
         self.thread_handle = Some(thread_job);
 
         // load configuration if config.yaml exists
+        #[cfg(feature = "debug")]
         if let Ok(yaml_string) = fs::read_to_string("config.yaml") {
             let config: Config = serde_yaml::from_str(&yaml_string)?;
             for v in config.egress.into_iter() {
