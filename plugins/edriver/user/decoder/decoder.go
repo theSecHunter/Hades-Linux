@@ -214,6 +214,36 @@ func (d *EbpfDecoder) DecodeString() (s string, err error) {
 	return
 }
 
+func (d *EbpfDecoder) DecodePath() (s string, err error) {
+	var size int32
+	if err = d.DecodeUint8(&d.index); err != nil {
+		return
+	}
+	if err = d.DecodeInt32(&size); err != nil {
+		return
+	}
+	// precheck size
+	if size >= 8192 {
+		err = fmt.Errorf("string size too long, size: %d", size)
+		return
+	}
+	if err = d.DecodeBytes(d.innerBuffer[:size-1], uint32(size-1)); err != nil {
+		return
+	}
+	d.DecodeUint8(&d.dummy)
+	s = string(d.innerBuffer[:size-1])
+	// NOTICE: for now, only ugly hardcode, will be better
+	if s == "pipe:" || s == "socket:" {
+		d.DecodeUint8(&d.dummy)
+		var inode uint64
+		if err = d.DecodeUint64(&inode); err != nil {
+			return
+		}
+		s = s + "[" + strconv.FormatUint(inode, 10) + "]"
+	}
+	return	
+}
+
 func (d *EbpfDecoder) DecodeAddr() (family, sport, dport uint16, sip, dip string, err error) {
 	// get family firstly
 	if err = d.DecodeUint8(&d.index); err != nil {
