@@ -1,13 +1,12 @@
 use libbpf_cargo::SkeletonBuilder;
-use std::env;
-use std::path::PathBuf;
+// use std::env;
+// use std::path::PathBuf;
+use std::path::Path;
 
 const SRC: &str = "src/bpf/eguard.bpf.c";
 
 fn main() {
-    let mut out =
-        PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR must be set in build script"));
-    out.push("eguard.skel.rs");
+    let out = Path::new("./src/bpf/eguard.skel.rs");
 
     SkeletonBuilder::new()
         .source(SRC)
@@ -17,7 +16,10 @@ fn main() {
             -I src/bpf/headers/ 
             -I../libs/core/
             -I../libs/bpfheaders/
-            -I src/bpf/ -DCORE",
+            -I src/bpf/ 
+            -DCORE
+            -D__BPF_TRACING__
+            -march=bpf -mcpu=v2",
         )
         .build_and_generate(&out)
         .unwrap();
