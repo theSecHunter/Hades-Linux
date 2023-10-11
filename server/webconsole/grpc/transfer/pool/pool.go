@@ -92,6 +92,7 @@ func (g *GRPCPool) SendCommand(agentID string, command *pb.Command) (err error) 
 	case <-time.After(2 * time.Second):
 		return errors.New("the command has been sent but get results timed out")
 	}
+	return
 }
 
 func (g *GRPCPool) All() []*Connection {
