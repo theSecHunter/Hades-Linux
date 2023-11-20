@@ -14,6 +14,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const MAX_LOG = 8
+
 type homePageResp struct {
 	// assets
 	HostOnline  int64 `json:"host_online"`
@@ -26,6 +28,8 @@ type homePageResp struct {
 	Vul      []int                    `json:"vul"`
 	Critical int                      `json:"critical"`
 	High     int                      `json:"high"`
+	Mid      int                      `json:"mid"`
+	Low      int                      `json:"low"`
 	// DB delay
 	RedisDelay int64 `json:"redis_delay"`
 	MongoDelay int64 `json:"mongo_delay"`
@@ -61,7 +65,7 @@ func HomePage(c *gin.Context) {
 	}
 	// record
 	findOptions := options.Find()
-	findOptions.SetLimit(6)
+	findOptions.SetLimit(MAX_LOG)
 	findOptions.SetSort(bson.M{"gmt_create": -1})
 	cur, err := mongo.MongoProxyImpl.RecordC.Find(ctx, bson.D{}, findOptions)
 	if err != nil {
@@ -112,16 +116,11 @@ func HomePage(c *gin.Context) {
 	}
 	// for debug
 	m := resp.Alert[6]
-	m["value"] = m["value"].(int) + 1
+	m["value"] = m["value"].(int) + 2
 	resp.Alert[6] = m
 
-	// resp.Alert = []map[string]interface{}{
-	// 	{"time": "2022-01-01", "value": 1},
-	// 	{"time": "2022-01-02", "value": 2},
-	// 	{"time": "2022-01-03", "value": 7},
-	// }
-	resp.Critical = 2
-	resp.High = 5
+	resp.Critical = 1
+	resp.High = 1
 	// Ping the redis / mongodb
 	defer cancel()
 	start := time.Now()
@@ -156,7 +155,7 @@ type record struct {
 func Record(c *gin.Context) {
 	var resp recordResp
 	findOptions := options.Find()
-	findOptions.SetLimit(6)
+	findOptions.SetLimit(MAX_LOG)
 	findOptions.SetSort(bson.M{"gmt_create": -1})
 	cur, err := mongo.MongoProxyImpl.RecordC.Find(context.Background(), bson.D{}, findOptions)
 	if err != nil {
