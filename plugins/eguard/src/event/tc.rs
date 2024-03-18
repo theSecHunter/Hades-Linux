@@ -1,8 +1,7 @@
 mod eguard_skel {
     include!("../bpf/eguard.skel.rs");
 }
-use crate::config::config::*;
-use crate::config::parser::CfgTrait;
+use crate::config::config::Config;
 use coarsetime::Clock;
 use lazy_static::lazy_static;
 use log::*;
@@ -10,23 +9,19 @@ use sdk::{Payload, Record};
 
 use super::eguard_skel::EguardSkel;
 use super::event::{get_default_interface, TX};
-use super::BpfProgram;
+use super::{update_map, BpfProgram};
 use anyhow::{Context, Result};
 use eguard_skel::*;
-use libbpf_rs::{Map, MapFlags, TcHook, TcHookBuilder, TC_EGRESS, TC_INGRESS};
+use libbpf_rs::{TcHook, TcHookBuilder, TC_EGRESS, TC_INGRESS};
 use plain::Plain;
 use std::collections::HashMap;
 use std::net::Ipv6Addr;
 use std::os::fd::AsFd;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::Mutex;
 
 lazy_static! {
     static ref TC_EVENT_HASH_MAP: Mutex<HashMap<&'static [u8], &'static [u8]>> = {
-        let m = HashMap::new();
-        Mutex::new(m)
-    };
-    static ref DNS_EVENT_HASH_MAP: Mutex<HashMap<&'static [u8], &'static [u8]>> = {
         let m = HashMap::new();
         Mutex::new(m)
     };
@@ -106,30 +101,24 @@ impl<'a> BpfProgram for TcEvent {
         Ok(())
     }
 
-    /// actually, it is destory
-    fn detech(&mut self, skel: &mut EguardSkel) -> Result<()> {
-        let mut destroy_all = libbpf_rs::TcHook::new(skel.progs().hades_egress().as_fd());
-        destroy_all
-            .ifindex(self.if_idx)
-            .attach_point(TC_EGRESS | TC_INGRESS);
-        destroy_all.destroy()?;
+    /// actually, it is destroy
+    fn detach(&mut self, _skel: &mut EguardSkel) -> Result<()> {
+        if let Some(mut egress_hook) = self.egress_hook {
+            egress_hook.detach()?;
+            egress_hook.destroy()?;
+        }
+        if let Some(mut ingress_hook) = self.ingress_hook {
+            ingress_hook.detach()?;
+            ingress_hook.destroy()?;
+        }
         Ok(())
     }
 
     fn flush_config(self: &TcEvent, cfgs: Config, skel: &mut EguardSkel) -> Result<()> {
-        // TC rules
-        // remove firstly
         update_map(
             cfgs.tc,
             TC_EVENT_HASH_MAP.lock().unwrap(),
             skel.maps_mut().policy_map(),
-        )?;
-
-        // DNS rules
-        update_map(
-            cfgs.dns,
-            DNS_EVENT_HASH_MAP.lock().unwrap(),
-            skel.maps_mut().dns_policy_map(),
         )?;
         Ok(())
     }
@@ -198,36 +187,4 @@ impl<'a> BpfProgram for TcEvent {
             None => return,
         }
     }
-}
-
-fn update_map<T>(
-    cache: Vec<T>,
-    mut map: MutexGuard<'_, HashMap<&[u8], &[u8]>>,
-    bpfmap: &mut Map,
-) -> Result<()>
-where
-    T: CfgTrait,
-{
-    // local cache up for bytes
-    let mut m = HashMap::new();
-    for v in cache {
-        let (key, value) = v.to_bytes()?;
-        m.insert(key, value);
-    }
-
-    let map_clone: HashMap<&[u8], &[u8]> = map.clone();
-    for (key, _) in map_clone.into_iter() {
-        if !m.contains_key(key) {
-            bpfmap.delete(&key)?;
-            map.remove(&key);
-        }
-    }
-
-    for (key, value) in m.into_iter() {
-        if !map.contains_key(&key[..]) {
-            bpfmap.update(&key, &value, MapFlags::ANY)?;
-        }
-    }
-
-    Ok(())
 }
