@@ -6,31 +6,32 @@ use yaml_rust::{YamlLoader, YamlEmitter};
 pub struct RuleImpl;
 
 impl RuleImpl {
+
     // Read json, yaml Data
-    fn ReadFileRule(sRulePath: String, sYamData: &mut String) -> bool {
-        if sRulePath.is_empty() || null() == sYamData {
+    pub fn read_file_rule(rule_path: String, yaml_data: &mut String) -> bool {
+        if rule_path.is_empty() || null() == yaml_data {
             return false;
         }
-        if !PathBuf::from(sRulePath.to_string()).exists() {
-            log::error!("Checkout Yaml File exists failuer. {}", sRulePath);
+        if !PathBuf::from(rule_path.to_string()).exists() {
+            log::error!("Checkout Yaml File exists failuer. {}", rule_path);
             return false;
         }
-        *sYamData = fs::read_to_string(sRulePath.to_string()).unwrap();
+        *yaml_data = fs::read_to_string(rule_path.to_string()).unwrap();
         return true;
     }
 
     // Analyze dns rule
-    pub fn GetDnsRule(sRulePath: String,  sYamData: &mut String) -> bool {
-        if sRulePath.is_empty() {
+    pub fn get_dns_rule(rule_path: String,  yaml_data: &mut String) -> bool {
+        if rule_path.is_empty() {
             return false;
         }
         
-        RuleImpl::ReadFileRule(sRulePath, sYamData);
-        if sYamData.is_empty() {
+        RuleImpl::read_file_rule(rule_path, yaml_data);
+        if yaml_data.is_empty() {
             return false;
         }
 
-        let docs: Vec<yaml_rust::Yaml> = YamlLoader::load_from_str(sYamData).unwrap();
+        let docs: Vec<yaml_rust::Yaml> = YamlLoader::load_from_str(yaml_data).unwrap();
 
         // Multi document support, doc is a yaml::Yaml
         let doc: &yaml_rust::Yaml = &docs[0];
@@ -57,12 +58,12 @@ impl RuleImpl {
     }
 
     // Analyze Redirect rule
-    pub fn GetRedirectRule(sRulePath:String) {
+    pub fn get_redirect_rule(rule_path: String) {
 
     }
 
     // Analyze transport layer rule
-    pub fn GetTransportNetRule(sRulePath:String) {
+    pub fn get_transport_rule(rule_path:String) {
 
     }
 

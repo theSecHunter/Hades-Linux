@@ -3,16 +3,6 @@ name = "wdriver_rs"
 version = "23.11.30"
 edition = "2021"
 
-# unit test rule
-[[bin]]
-name = "unitRule"
-path = "tests\\tsRule.rs"
-
-# unit test driven
-[[bin]]
-name = "unitDrivern"
-path = "tests\\tsDrvmg.rs"
-
 [dependencies]
 log = "0.4.17"
 yaml-rust = "0.4"

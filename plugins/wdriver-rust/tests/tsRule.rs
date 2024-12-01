@@ -1,20 +1,19 @@
 use fast_log::{consts::LogSize, plugin::{file_split::RollingType, packer::LogPacker}};
-use netCom::RuleImpl;
-
+use wdriver_rs::rule::RuleImpl;
 
 #[test]
-pub fn UnitGetDnsRule() {
-    let mut sYamData: String = String::from("");
-    let mut sCurrentPath = std::env::current_dir().unwrap().to_str().unwrap().to_string();
-    if sCurrentPath.is_empty() {
+pub fn unit_get_dns_rule() {
+    let mut yaml_data: String = String::from("");
+    let mut current_path = std::env::current_dir().unwrap().to_str().unwrap().to_string();
+    if current_path.is_empty() {
         log::error!("Get Rule DirPath Failuer.");
         return;
     }
-    let sNetRulePath: String = sCurrentPath + "\\config\\networkRuleConfig.yaml";
-    let bRet: bool = RuleImpl::GetDnsRule(sNetRulePath, &mut sYamData);
-    if false == bRet {
+    let rule_path: String = current_path + "\\config\\networkRuleConfig.yaml";
+    let b: bool = RuleImpl::get_dns_rule(rule_path, &mut yaml_data);
+    if false == b {
         log::error!("Get Rule DirPath Failuer.");
         return;
     }
-    println!("Analyze Rule Success. {}",sYamData);
+    println!("Analyze Rule Success. {}", yaml_data);
 }

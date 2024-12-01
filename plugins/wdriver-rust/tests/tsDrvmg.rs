@@ -1,17 +1,17 @@
-use netCom::DrivenManageImpl;
+use wdriver_rs::drvmg::DrivenManageImpl;
 
 #[test]
 // 驱动启动状态
-pub fn UnitGetDrivenStu() {
-    let strDrivenName :String= String::from("\\Hades\\HadesNet");
-    let mut hObjDrivenMang: DrivenManageImpl = DrivenManageImpl::new();
-    let bSuc: bool = hObjDrivenMang.OpenDriverHandle(strDrivenName);
+pub fn unit_get_driven_stu() {
+    let drivename :String= String::from("\\Hades\\HadesNet");
+    let mut driverobj: DrivenManageImpl = DrivenManageImpl::new();
+    let b : bool = driverobj.open_driver_handle(drivename);
     loop {
-        if bSuc == false {
+        if b  == false {
             break;
         }
         // checkout handle invalid
-        if hObjDrivenMang.m_hDriver.is_invalid() {
+        if driverobj.handle.is_invalid() {
             break;
         }
         
