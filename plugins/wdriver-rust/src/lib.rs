@@ -1,3 +1,3 @@
 // @exterm lib mod
-pub mod rule;
 pub mod drvmg;
+pub mod rule;
