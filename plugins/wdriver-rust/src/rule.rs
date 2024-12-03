@@ -1,4 +1,6 @@
 extern crate yaml_rust;
+use crate::{log::init_log};
+
 use napi::threadsafe_function::ThreadsafeFunction;
 use napi_derive::napi;
 use serde::{Deserialize, Serialize};
@@ -15,37 +17,17 @@ use std::{
 use yaml_rust::{YamlEmitter, YamlLoader};
 
 pub struct RuleImpl {
-    // // dns
-    // rule_dns: Arc<RuleDns>,
-
-    // // redirect
-    // rule_redirect: Arc<RuleRediRect>,
-
-    // // transport
-    // rule_transport: Arc<RuleTranSport>,
-
-    // // directory
-    // rule_directory: Arc<RuleDirectoryArray>,
-
-    // // process
-    // rule_process: Arc<RuleProcess>,
-
-    // // thread
-    // rule_thread: Arc<RuleThread>,
-
-    // // register
-    // rule_register: Arc<RuleResgiter>,
     // dns
-    rule_dns: RuleDns,
+    rule_dns: Vec<RuleDns>,
 
     // redirect
-    rule_redirect: RuleRediRect,
+    rule_redirect: Vec<RuleRediRect>,
 
     // transport
-    rule_transport: RuleTranSport,
+    rule_transport: Vec<RuleTranSport>,
 
     // directory
-    rule_directory: RuleDirectoryArray,
+    rule_directory: Vec<RuleDirectory>,
 
     // process
     rule_process: RuleProcess,
@@ -54,11 +36,16 @@ pub struct RuleImpl {
     rule_thread: RuleThread,
 
     // register
-    rule_register: RuleResgiter,
+    rule_register: Vec<RuleResgiter>,
 }
 
 impl RuleImpl {
     pub async fn init() -> bool {
+        let path = get_path().unwrap();
+        let debug = init_log(&path);
+        if !debug {
+        }
+
         // get cuurent exec path
         let current_path = std::env::current_dir()
             .unwrap()
@@ -71,86 +58,68 @@ impl RuleImpl {
         }
 
         // init dns rule
-        let mut rule_dns = RuleDns {
-            name: "".to_string(),
-            address: "".to_string(),
-            protocol: "".to_string(),
-            action: "".to_string(),
-        };
+        let mut rule_dns : Vec<RuleDns> = vec![];
         {
             let mut _data: String = String::from("");
             let rule_path: String = current_path.clone() + "\\config\\networkRuleConfig.yaml";
-            let b: bool = RuleImpl::get_dns_rule(rule_path, &mut _data);
+            let b: bool = RuleImpl::get_dns_rule(rule_path, &mut _data, &mut rule_dns);
             if true == b {
-                println!("analyze dns rule success. {}", _data);
+                log::debug!("analyze dns rule success. {}", _data);
             } else {
                 log::error!("get dns rule fails.");
             }
         }
 
         // init redirect rule
-        let mut rule_redirect = RuleRediRect {
-            name: "".to_string(),
-            address: "".to_string(),
-            protocol: "".to_string(),
-            action: "".to_string(),
-        };
+        let mut rule_redirect :Vec<RuleRediRect> = vec![];
         {
             let mut _data: String = String::from("");
             let rule_path: String = current_path.clone() + "\\config\\networkRuleConfig.yaml";
-            let b: bool = RuleImpl::get_redirect_rule(rule_path, &mut _data);
+            let b: bool = RuleImpl::get_redirect_rule(rule_path, &mut _data, &mut rule_redirect);
             if true == b {
-                println!("analyze redirect rule success. {}", _data);
+                log::debug!("analyze redirect rule success. {}", _data);
             } else {
                 log::error!("get redirect rule fails.");
             }
         }
 
         // init transport rule
-        let mut rule_transport = RuleTranSport {
-            name: "".to_string(),
-            address: "".to_string(),
-            protocol: "".to_string(),
-            action: "".to_string(),
-        };
+        let mut rule_transport:Vec<RuleTranSport> = vec![];
         {
             let mut _data: String = String::from("");
             let rule_path: String = current_path.clone() + "\\config\\networkRuleConfig.yaml";
-            let b: bool = RuleImpl::get_transport_rule(rule_path, &mut _data);
+            let b: bool = RuleImpl::get_transport_rule(rule_path, &mut _data, &mut rule_transport);
             if true == b {
-                println!("analyze transport rule success. {}", _data);
+                log::debug!("analyze transport rule success. {}", _data);
             } else {
                 log::error!("get transport rule fails.");
             }
         }
 
         // init directory rule
-        let mut vec_directory: Vec<RuleDirectory> = Vec::new();
-        let mut rule_directory = RuleDirectoryArray {
-            rule_array: vec_directory,
-        };
+        let mut rule_directory: Vec<RuleDirectory> = vec![];
         {
             let mut _data: String = String::from("");
             let rule_path: String = current_path.clone() + "\\config\\directoryRuleConfig.json";
-            let _ = RuleImpl::get_dirtecory_rule(rule_path, &mut _data);
-            // if true == b {
-            //     println!("analyze directory success. {}", _data);
-            // } else {
-            //     log::error!("get directory rule fails.");
-            // }
+            let b = RuleImpl::get_dirtecory_rule(rule_path, &mut _data, &mut rule_directory).is_ok();
+            if true == b {
+                log::debug!("analyze directory success. {}", _data);
+            } else {
+                log::error!("get directory rule fails.");
+            }
         }
 
         // init process rule
         let mut rule_process = RuleProcess {
-            rule_type: "".to_string(),
+            rule_type: 0,
             process_name: "".to_string(),
         };
         {
             let mut _data: String = String::from("");
             let rule_path: String = current_path.clone() + "\\config\\processRuleConfig.json";
-            let b: bool = RuleImpl::get_process_rule(rule_path, &mut _data);
+            let b: bool = RuleImpl::get_process_rule(rule_path, &mut _data, &mut rule_process).is_ok();
             if true == b {
-                println!("analyze transport success. {}", _data);
+                log::debug!("analyze transport success. {}", _data);
             } else {
                 log::error!("get transport rule fails.");
             }
@@ -163,27 +132,22 @@ impl RuleImpl {
         {
             let mut _data: String = String::from("");
             let rule_path: String = current_path.clone() + "\\config\\threadRuleConfig.json";
-            let b: bool = RuleImpl::get_thread_rule(rule_path, &mut _data);
+            let b: bool = RuleImpl::get_thread_rule(rule_path, &mut _data, &mut rule_thread).is_ok();
             if true == b {
-                println!("analyze thread success. {}", _data);
+                log::debug!("analyze thread success. {}", _data);
             } else {
                 log::error!("get thread rule fails.");
             }
         }
 
         // init register rule
-        let mut rule_register = RuleResgiter {
-            rule_type: "".to_string(),
-            process_name: "".to_string(),
-            register_key: "".to_string(),
-            register_permiss: "".to_string(),
-        };
+        let mut rule_register: Vec<RuleResgiter> = vec![];
         {
             let mut _data: String = String::from("");
             let rule_path: String = current_path.clone() + "\\config\\registerRuleConfig_.json";
-            let b: bool = RuleImpl::get_register_rule(rule_path, &mut _data);
+            let b: bool = RuleImpl::get_register_rule(rule_path, &mut _data, &mut rule_register).is_ok();
             if true == b {
-                println!("analyze register success. {}", _data);
+                log::debug!("analyze register success. {}", _data);
             } else {
                 log::error!("get register rule fails.");
             }
@@ -216,7 +180,7 @@ impl RuleImpl {
     }
 
     // Analyze dns rule
-    pub fn get_dns_rule(file_path: String, _data: &mut String) -> bool {
+    pub fn get_dns_rule(file_path: String, _data: &mut String,  rule_transport: &mut Vec<RuleDns>) -> bool {
         if file_path.is_empty() {
             return false;
         }
@@ -253,7 +217,7 @@ impl RuleImpl {
     }
 
     // Analyze Redirect rule
-    pub fn get_redirect_rule(file_path: String, _data: &mut String) -> bool {
+    pub fn get_redirect_rule(file_path: String, _data: &mut String, rule_transport: &mut Vec<RuleRediRect>) -> bool {
         if file_path.is_empty() {
             return false;
         }
@@ -274,7 +238,7 @@ impl RuleImpl {
     }
 
     // Analyze transport layer rule
-    pub fn get_transport_rule(file_path: String, _data: &mut String) -> bool {
+    pub fn get_transport_rule(file_path: String, _data: &mut String, rule_transport: &mut Vec<RuleTranSport>) -> bool {
         if file_path.is_empty() {
             return false;
         }
@@ -295,7 +259,7 @@ impl RuleImpl {
     }
 
     // Analyze directory rule
-    pub fn get_dirtecory_rule(file_path: String, _data: &mut String) -> Result<(), napi::Error> {
+    pub fn get_dirtecory_rule(file_path: String, _data: &mut String, rule_diretcory: &mut Vec<RuleDirectory>) -> Result<(), napi::Error> {
         loop {
             if file_path.is_empty() {
                 break;
@@ -304,7 +268,9 @@ impl RuleImpl {
             if _data.is_empty() {
                 break;
             }
-            let rule_array: RuleDirectoryArray = serde_json::from_str(&_data)?;
+
+            *rule_diretcory = serde_json::from_str(&_data)?;
+
             break;
         }
 
@@ -312,19 +278,72 @@ impl RuleImpl {
     }
 
     // Analyze process rule
-    pub fn get_process_rule(file_path: String, _data: &mut String) -> bool {
-        return true;
+    pub fn get_process_rule(file_path: String, _data: &mut String, rule_process: &mut RuleProcess) -> Result<(), napi::Error> {
+        loop {
+            if file_path.is_empty() {
+                break;
+            }
+            RuleImpl::read_file_data(file_path, _data);
+            if _data.is_empty() {
+                break;
+            }
+
+            *rule_process = serde_json::from_str(&_data)?;
+
+            break;
+        }
+
+        Ok(())
     }
 
     // Analyze thread rule
-    pub fn get_thread_rule(file_path: String, _data: &mut String) -> bool {
-        return true;
+    pub fn get_thread_rule(file_path: String, _data: &mut String, rule_thread: &mut RuleThread) -> Result<(), napi::Error> {
+        loop {
+            if file_path.is_empty() {
+                break;
+            }
+            RuleImpl::read_file_data(file_path, _data);
+            if _data.is_empty() {
+                break;
+            }
+
+            *rule_thread = serde_json::from_str(&_data).unwrap();
+
+            break;
+        }
+
+        Ok(())
     }
 
     // Analyze register rule
-    pub fn get_register_rule(file_path: String, _data: &mut String) -> bool {
-        return true;
+    pub fn get_register_rule(file_path: String, _data: &mut String, rule_register: &mut Vec<RuleResgiter>) -> Result<(), napi::Error> {
+        loop {
+            if file_path.is_empty() {
+                break;
+            }
+            RuleImpl::read_file_data(file_path, _data);
+            if _data.is_empty() {
+                break;
+            }
+
+            *rule_register = serde_json::from_str(&_data).unwrap();
+
+            break;
+        }
+        
+        Ok(())
     }
+
+}
+
+pub fn get_path() -> Result<PathBuf, napi::Error> {
+    let path = process_path::get_dylib_path();
+    if let Some(p) = path {
+        if let Some(parent) = p.parent() {
+            return Ok(parent.to_path_buf());
+        }
+    }
+    Err(napi::Error::from_reason("get dylib path error".to_string()))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -366,35 +385,19 @@ pub struct RuleTranSport {
 #[derive(Serialize, Deserialize)]
 pub struct RuleDirectory {
     #[serde(rename = "FileIORuleMod")]
-    pub rule_type: String,
+    pub rule_type: u32,
     #[serde(rename = "processName")]
     pub process_name: String,
     #[serde(rename = "Directory")]
     pub directory_path: String,
 }
-#[derive(Serialize, Deserialize)]
-pub struct RuleDirectoryArray {
-    rule_array: Vec<RuleDirectory>,
-}
 
 #[derive(Serialize, Deserialize)]
 pub struct RuleProcess {
     #[serde(rename = "processRuleMod")]
-    pub rule_type: String,
+    pub rule_type: u32,
     #[serde(rename = "processName")]
     pub process_name: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct RuleResgiter {
-    #[serde(rename = "registerRuleMod")]
-    pub rule_type: String,
-    #[serde(rename = "processName")]
-    pub process_name: String,
-    #[serde(rename = "registerValuse")]
-    pub register_key: String,
-    #[serde(rename = "permissions")]
-    pub register_permiss: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -403,6 +406,21 @@ pub struct RuleThread {
     pub process_name: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct RuleResgiter {
+    #[serde(rename = "registerRuleMod")]
+    pub rule_type: u32,
+    #[serde(rename = "processName")]
+    pub process_name: String,
+    #[serde(rename = "registerValuse")]
+    pub register_key: String,
+    #[serde(rename = "permissions")]
+    pub register_permiss: String,
+}
+
 // Unit test
 #[cfg(test)]
-mod test {}
+mod test {
+    
+
+}

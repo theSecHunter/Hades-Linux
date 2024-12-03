@@ -1,6 +1,9 @@
-use std::{fs, io::Read, path::PathBuf, ptr::null};
+use std::{fs, io::Read, path::PathBuf, ptr::null, result};
 use windows::{
-    core::*, Win32::Foundation::*, Win32::Storage::FileSystem::*, Win32::System::Threading::*,
+    core::*, 
+    Win32::Foundation::*, 
+    Win32::Storage::FileSystem::*, 
+    Win32::System::Threading::*,
     Win32::System::IO::*,
 };
 
@@ -21,33 +24,47 @@ impl DrivenManageImpl {
     // Open DriverHandle
     pub fn open_driver_handle(&mut self, driver_name: String) -> bool {
         unsafe {
-            let dwAttribute: u32 = 2147483648u32 | 1073741824u32;
-            let hResult: std::prelude::v1::Result<HANDLE, Error> = CreateFileA(
+            let attribute: u32 = 2147483648u32 | 1073741824u32;
+            let result: std::prelude::v1::Result<HANDLE, Error> = CreateFileA(
                 PCSTR(driver_name.as_ptr()),
-                dwAttribute,
+                attribute,
                 FILE_SHARE_MODE(0),
                 None,
                 OPEN_EXISTING,
                 FILE_FLAG_OVERLAPPED,
                 None,
             );
-            if hResult.is_ok() {
-                let hDriver: HANDLE = hResult.unwrap();
-                self.handle = hDriver;
+            if result.is_ok() {
+                let driver_handle: HANDLE = result.unwrap();
+                self.handle = driver_handle;
                 return true;
             } else {
-                let hResultError: std::prelude::v1::Result<(), Error> = GetLastError();
-                println!("{}", hResultError.unwrap_err().code());
+                let err: std::prelude::v1::Result<(), Error> = GetLastError();
+                println!("{}", err.unwrap_err().code());
                 return false;
             }
         }
     }
 
     // Send Data Pop Data
-    pub fn send_driver_data(code: u32, data: String) -> bool {
+    pub async  fn send_driver_data(&self, _code: u32, _data: String) -> bool {
+
         return true;
     }
 
     // Read Data Push Queue
-    pub fn read_driver_data() {}
+    pub async fn read_driver_data(&self) {
+
+    }
+
+    pub fn close_driver_handle(&mut self) {
+        if self.handle.is_invalid(){
+            return;
+        }
+        unsafe {
+            CloseHandle(self.handle);
+        }
+        self.handle = HANDLE(0);
+    }
+    
 }
