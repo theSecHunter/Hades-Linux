@@ -1,7 +1,6 @@
-// network packet filter handle
-pub struct HandleMSG;
+pub struct Event;
 
-impl HandleMSG {
+impl Event {
 
 
     // Handle Message

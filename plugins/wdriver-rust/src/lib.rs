@@ -1,4 +1,6 @@
-// @exterm lib mod
-pub mod drvmg;
-pub mod rule;
+pub mod config;
+pub mod events;
+pub mod driver;
+pub mod appcore;
+pub mod kercore;
 pub mod log;

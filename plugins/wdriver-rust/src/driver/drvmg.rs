@@ -1,4 +1,4 @@
-use std::{fs, io::Read, path::PathBuf, ptr::null, result};
+use std::{fs, io::Read, path::PathBuf, ptr::{null, null_mut}, result};
 use windows::{
     core::*, 
     Win32::Foundation::*, 
@@ -13,11 +13,12 @@ pub struct DrivenManageImpl {
 
 impl DrivenManageImpl {
     pub fn new() -> Self {
-        Self { handle: HANDLE(0) }
+        Self { handle: HANDLE(null_mut()) }
     }
 
     // Chekcout Driver Status
     pub fn get_driver_stu(driver_name: String) -> bool {
+        
         return true;
     }
 
@@ -39,8 +40,8 @@ impl DrivenManageImpl {
                 self.handle = driver_handle;
                 return true;
             } else {
-                let err: std::prelude::v1::Result<(), Error> = GetLastError();
-                println!("{}", err.unwrap_err().code());
+                let err  = GetLastError();
+                println!("{}", err.to_hresult().0);
                 return false;
             }
         }
@@ -62,9 +63,9 @@ impl DrivenManageImpl {
             return;
         }
         unsafe {
-            CloseHandle(self.handle);
+            let _ = CloseHandle(self.handle);
         }
-        self.handle = HANDLE(0);
+        self.handle = HANDLE(null_mut());
     }
-    
+
 }

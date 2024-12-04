@@ -1,10 +1,10 @@
 use fast_log::{
-    consts::LogSize,
-    plugin::{file_split::RollingType, packer::LogPacker},
+    config, consts::LogSize, plugin::{file_split::RollingType, packer::LogPacker}
 };
-use wdriver_rs::rule::RuleImpl;
 use tokio::{io::AsyncWriteExt, sync::{mpsc::Sender, RwLock}, task::JoinHandle, runtime::Runtime};
 use std::{thread::{self, current}, time};
+
+use wdriver_rs::config::config::*;
 
 #[test]
 pub fn unit_get_dns_rule() {

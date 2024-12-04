@@ -1,8 +1,6 @@
 extern crate yaml_rust;
-use crate::{log::init_log};
-
-use napi::threadsafe_function::ThreadsafeFunction;
 use napi_derive::napi;
+use napi::threadsafe_function::ThreadsafeFunction;
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -15,6 +13,8 @@ use std::{
     },
 };
 use yaml_rust::{YamlEmitter, YamlLoader};
+
+use crate::{log::init_log};
 
 pub struct RuleImpl {
     // dns
@@ -154,13 +154,13 @@ impl RuleImpl {
         }
 
         Self {
-            rule_dns,
-            rule_redirect,
-            rule_transport,
-            rule_directory,
-            rule_process,
-            rule_thread,
-            rule_register,
+            rule_dns: rule_dns,
+            rule_redirect: rule_redirect,
+            rule_transport: rule_transport,
+            rule_directory: rule_directory,
+            rule_process: rule_process,
+            rule_thread: rule_thread,
+            rule_register: rule_register,
         };
 
         return true;
@@ -180,7 +180,7 @@ impl RuleImpl {
     }
 
     // Analyze dns rule
-    pub fn get_dns_rule(file_path: String, _data: &mut String,  rule_transport: &mut Vec<RuleDns>) -> bool {
+    pub fn get_dns_rule(file_path: String, _data: &mut String,  rule_dns: &mut Vec<RuleDns>) -> bool {
         if file_path.is_empty() {
             return false;
         }
@@ -217,7 +217,7 @@ impl RuleImpl {
     }
 
     // Analyze Redirect rule
-    pub fn get_redirect_rule(file_path: String, _data: &mut String, rule_transport: &mut Vec<RuleRediRect>) -> bool {
+    pub fn get_redirect_rule(file_path: String, _data: &mut String, rule_redirect: &mut Vec<RuleRediRect>) -> bool {
         if file_path.is_empty() {
             return false;
         }
@@ -418,9 +418,3 @@ pub struct RuleResgiter {
     pub register_permiss: String,
 }
 
-// Unit test
-#[cfg(test)]
-mod test {
-    
-
-}
