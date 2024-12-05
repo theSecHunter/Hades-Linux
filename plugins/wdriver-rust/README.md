@@ -1,6 +1,10 @@
 # Hades Windows Driver
 
-wdriver-rsut优先提供Windows插件模块管理，管理组件核心dll
+wdriver-rsut等同于HadesSvc
+```
+HadesSvc - 插件服务
+https://github.com/theSecHunter/Hades-Windows/tree/main/HadSvc
+```
 ```
 NetDrvlib64.dll - 内核网络
 https://github.com/theSecHunter/Hades-Windows/tree/main/MonitorEvent/netdrvlib
@@ -21,7 +25,7 @@ SysMonUserlib64.dll - 用户态探针
 https://github.com/theSecHunter/Hades-Windows/tree/main/MonitorEvent/sysmonuserlib
 ```
 
-依赖于Driver驱动能力
+依赖Driver驱动
 ```
 SysMonDrvlib64 -> sysmondriver.sys - 内核驱动
 https://github.com/theSecHunter/Hades-Windows/tree/main/MonitorEvent/sysmondrv
@@ -32,22 +36,22 @@ NetDrvlib64 -> hadesndr.sys - 网络驱动
 https://github.com/theSecHunter/Hades-Windows/tree/main/MonitorEvent/netdrvlib
 ```
 
-wdriver-rsut目标替换c++组件库，整合NetDrvlib64，RuleEnginelib64，SysMonDrvlib64，SysMonUserlib64动态库能力，重构插件。
+wdriver-rsut目标重构c++组件库HadesSvc，整合NetDrvlib64，RuleEnginelib64，SysMonDrvlib64，SysMonUserlib64动态库能力。
 
 ```
-rule.rs -> RuleEnginelib64.dll - 规则引擎
-```
-
-```
-knetfilter.rs -> NetDrvlib64.dll - 内核网络
+config/config.rs -> RuleEnginelib64.dll - 规则引擎
 ```
 
 ```
-kmonfilter.rs -> SysMonDrvlib64.dll - 内核探针
+kercore/wfp -> NetDrvlib64.dll - 内核网络
 ```
 
 ```
-umonfilter.rs -> SysMonUserlib64.dll - 用户态探针
+kercore/ark -> SysMonDrvlib64.dll - 内核探针
+```
+
+```
+appcore -> SysMonUserlib64.dll - 用户态探针
 ```
 
 driver sys不变

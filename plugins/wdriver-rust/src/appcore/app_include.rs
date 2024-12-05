@@ -49,6 +49,7 @@ pub struct AppDriectInfo {
 pub struct AppNetWorkInfo {
     pub pid: String,
     pub processname: String,
+    pub cmd: String,
     pub protocol: String,
     pub localaddress: String,
     pub remoteaddress: String,

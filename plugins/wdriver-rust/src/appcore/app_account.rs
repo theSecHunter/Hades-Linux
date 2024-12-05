@@ -9,7 +9,7 @@ pub struct AppAccount {
 impl AppAccount {
     pub fn init() -> bool {
         let mut account_info: Vec<AppAccountInfo> = vec![];
-        let bOk = Self::get_account(&mut account_info);
+        let bOk = Self::get_account_info(&mut account_info);
         if false == bOk {
             return false;
         }
@@ -20,7 +20,7 @@ impl AppAccount {
         return true;
     }
 
-    pub fn get_account(account_info:&mut Vec<AppAccountInfo>) -> bool {
+    pub fn get_account_info(account_info:&mut Vec<AppAccountInfo>) -> bool {
         let users = Users::new_with_refreshed_list();
         for user in users.list() {
             let account_ctx = AppAccountInfo{

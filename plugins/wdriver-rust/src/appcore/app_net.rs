@@ -1,6 +1,7 @@
-use netstat::*;
+use std::ops::Deref;
+
+use netstat2::*;
 use sysinfo::*;
-//use std::{os::ProcessInfo};
 use crate::{appcore::app_include::AppNetWorkInfo};
 
 pub struct AppNetwork {
@@ -33,31 +34,40 @@ impl AppNetwork {
 
         if let Ok(sockets_info) = sockets_info {
             for si in sockets_info {
-                // let proc_info = si
-                //     .associated_pids
-                //     .into_iter()
-                //     .find_map(|pid| sysinfo.process(Pid::from_u32(pid)))
-                //     .map(|p| ProcessInfo::new(&p.name().to_string_lossy(), p.pid().as_u32()))
-                //     .unwrap_or_default();
-
+                let proc_info = si
+                    .associated_pids
+                    .into_iter()
+                    .find_map(|pid| sysinfo.process(Pid::from_u32(pid))).unwrap();
+                    // .map(|p| ProcessInfo::new(&p.name().to_string_lossy(), p.pid().as_u32()))
+                    // .unwrap_or_default();
+                let mut cmdline  = "".to_string();
+                for s in proc_info.cmd() {
+                    if s.is_empty() {
+                        continue;
+                    }
+                    cmdline.push_str(s.clone().into_string().unwrap().as_str());
+                    cmdline.push_str("|");
+                }
                 match si.protocol_socket_info {
                     ProtocolSocketInfo::Tcp(tcp_si) => {
                         let network_ctx: AppNetWorkInfo = AppNetWorkInfo {
-                            pid: "".to_string(),
-                            processname: "".to_string(),
+                            pid: proc_info.pid().to_string(),
+                            processname: proc_info.name().to_os_string().into_string().unwrap(),
+                            cmd: cmdline,
                             protocol: "TCP".to_string(),
                             localaddress: tcp_si.local_addr.to_string(),
                             remoteaddress: tcp_si.remote_addr.to_string(),
                             localport: tcp_si.local_port as u32,
                             remoteport: tcp_si.remote_port as u32,
-                            state: "".to_string(),
+                            state: tcp_si.state.to_string(),
                         };
                         network_info.push(network_ctx);
                     }
                     ProtocolSocketInfo::Udp(udp_si) => {
                         let network_ctx: AppNetWorkInfo = AppNetWorkInfo {
-                            pid: "".to_string(),
-                            processname: "".to_string(),
+                            pid: proc_info.pid().to_string(),
+                            processname: proc_info.name().to_os_string().into_string().unwrap(),
+                            cmd: "".to_string(),
                             protocol: "UDP".to_string(),
                             localaddress: udp_si.local_addr.to_string(),
                             remoteaddress: "".to_string(),

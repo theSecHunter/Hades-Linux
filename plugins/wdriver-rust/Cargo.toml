@@ -17,8 +17,8 @@ napi = { version = "2.16.12", default-features = false, features = ["napi4", "se
 napi-derive = "2.16.12"
 tokio = { version = "1.40.0", features = ["rt-multi-thread", "sync", "io-util", "time", "process", "macros", "rt", "fs", "net"] }
 tokio-util = "0.7.12"
-netstat = "0.7.0"
-# netstat2 = "0.11.0"
+#netstat = "0.7.0"
+netstat2 = "0.11.0"
 sysinfo = "0.32.1"
 win_etw_macros = "0.1.*"
 win_etw_provider = "0.1.*"
