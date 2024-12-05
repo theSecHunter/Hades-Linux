@@ -35,13 +35,13 @@ impl AppProcess {
             }
             let process_ctx = AppProcessInfo{
                 pid: pid.as_u32(),
-                th32parentprocessid: 0,
-                exefile: process.name().to_os_string().into_string().unwrap(),
-                priclassbase: process.status().to_string(),
-                threadcount: match process.parent() {
+                th32parentprocessid: match process.parent() {
                     Some(_) => { process.parent().unwrap().as_u32() },
                     None => { 0 },
                 },
+                exefile: process.name().to_os_string().into_string().unwrap(),
+                priclassbase: process.status().to_string(),
+                threadcount: 0,
                 processfullpath: cmdline,
             };
             process_info.push(process_ctx);
@@ -52,4 +52,5 @@ impl AppProcess {
         }
         return true;
     }
+    
 }

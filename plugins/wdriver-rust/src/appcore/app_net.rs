@@ -51,7 +51,11 @@ impl AppNetwork {
                 match si.protocol_socket_info {
                     ProtocolSocketInfo::Tcp(tcp_si) => {
                         let network_ctx: AppNetWorkInfo = AppNetWorkInfo {
-                            pid: proc_info.pid().to_string(),
+                            pid: proc_info.pid().as_u32(),
+                            th32parentprocessid: match proc_info.parent() {
+                                Some(_) => { proc_info.parent().unwrap().as_u32() },
+                                None => { 0 },
+                            },
                             processname: proc_info.name().to_os_string().into_string().unwrap(),
                             cmd: cmdline,
                             protocol: "TCP".to_string(),
@@ -65,7 +69,11 @@ impl AppNetwork {
                     }
                     ProtocolSocketInfo::Udp(udp_si) => {
                         let network_ctx: AppNetWorkInfo = AppNetWorkInfo {
-                            pid: proc_info.pid().to_string(),
+                            pid: proc_info.pid().as_u32(),
+                            th32parentprocessid: match proc_info.parent() {
+                                Some(_) => { proc_info.parent().unwrap().as_u32() },
+                                None => { 0 },
+                            },
                             processname: proc_info.name().to_os_string().into_string().unwrap(),
                             cmd: "".to_string(),
                             protocol: "UDP".to_string(),
@@ -86,4 +94,5 @@ impl AppNetwork {
         }
         return true;
     }
+    
 }

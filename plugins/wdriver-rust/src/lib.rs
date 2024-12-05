@@ -3,4 +3,4 @@ pub mod events;
 pub mod driver;
 pub mod appcore;
 pub mod kercore;
-pub mod log;
+pub mod util;

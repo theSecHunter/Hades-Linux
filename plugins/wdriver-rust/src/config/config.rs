@@ -14,7 +14,7 @@ use std::{
 };
 use yaml_rust::{YamlEmitter, YamlLoader};
 
-use crate::{log::init_log};
+use crate::{util::log::init_log};
 
 pub struct RuleImpl {
     // dns

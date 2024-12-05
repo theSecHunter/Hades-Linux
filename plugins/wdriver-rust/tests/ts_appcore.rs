@@ -1,6 +1,8 @@
+use wdriver_rs::appcore::app_include;
 use wdriver_rs::appcore::app_account;
 use wdriver_rs::appcore::app_net;
 use wdriver_rs::appcore::app_process;
+use wdriver_rs::appcore::app_service_software;
 
 #[test]
 pub fn unit_test_account() {
@@ -23,5 +25,23 @@ pub fn unit_test_processinfo() {
     let b = app_process::AppProcess::init();
     if b {
         println!("process init success.");
+    }
+}
+
+#[test]
+pub fn unit_test_servicesinfo() {
+    let mut serivce_info: Vec<app_include::AppServiceInfo> = vec![];
+    let b = app_service_software::AppServiceSoftWare::get_services_info(&mut serivce_info);
+    if b {
+        println!("service init success.");
+    }
+}
+
+#[test]
+pub fn unit_test_softwareinfo() {
+    let mut software_info: Vec<app_include::AppSoftWareInfo> = vec![];
+    let b = app_service_software::AppServiceSoftWare::get_software_info(&mut software_info);
+    if b {
+        println!("software init success.");
     }
 }

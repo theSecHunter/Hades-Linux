@@ -47,7 +47,8 @@ pub struct AppDriectInfo {
 
 // network
 pub struct AppNetWorkInfo {
-    pub pid: String,
+    pub pid: u32,
+    pub th32parentprocessid: u32,
     pub processname: String,
     pub cmd: String,
     pub protocol: String,
@@ -72,7 +73,7 @@ pub struct  AppProcessInfo {
 pub struct AppSoftWareInfo {
     pub name: String,
     pub version: String,
-    pub data: String,
+    pub helplink: String,
     pub size: String,
     pub insatllpath: String,
     pub uninstallpath: String,

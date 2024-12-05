@@ -19,7 +19,8 @@ tokio = { version = "1.40.0", features = ["rt-multi-thread", "sync", "io-util", 
 tokio-util = "0.7.12"
 #netstat = "0.7.0"
 netstat2 = "0.11.0"
-sysinfo = "0.32.1"
+sysinfo = "0.33.0"
+winreg = "0.52.0"
 win_etw_macros = "0.1.*"
 win_etw_provider = "0.1.*"
 
