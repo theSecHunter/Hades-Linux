@@ -1,5 +1,6 @@
-use wdriver_rs::appcore::app_include;
 use wdriver_rs::appcore::app_account;
+use wdriver_rs::appcore::app_autostart;
+use wdriver_rs::appcore::app_include;
 use wdriver_rs::appcore::app_net;
 use wdriver_rs::appcore::app_process;
 use wdriver_rs::appcore::app_service_software;
@@ -43,5 +44,14 @@ pub fn unit_test_softwareinfo() {
     let b = app_service_software::AppServiceSoftWare::get_software_info(&mut software_info);
     if b {
         println!("software init success.");
+    }
+}
+
+#[test]
+pub fn unit_test_astart_register() {
+    let mut astart_register: Vec<app_include::AppRegRunInfo> = vec![];
+    let b = app_autostart::AppAutoStart::get_astart_register(&mut astart_register);
+    if b {
+        println!("astart_register init success.");
     }
 }
