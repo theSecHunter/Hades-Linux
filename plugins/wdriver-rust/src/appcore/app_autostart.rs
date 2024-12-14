@@ -29,6 +29,11 @@ impl AppAutoStart {
     pub fn get_astart_register(astart_register:&mut Vec<AppRegRunInfo>) -> bool {
         let apps = App::list().unwrap();
         for app in apps {
+            let regrun_ctx = AppRegRunInfo {
+                valuename: app.get_key(),
+                valuekey: app.get_value(),
+            };
+            astart_register.push(regrun_ctx);
         }
         if astart_register.is_empty() {
             return false;

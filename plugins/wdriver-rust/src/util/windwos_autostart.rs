@@ -1,7 +1,9 @@
 use std::borrow::Cow;
 use std::error::Error;
+use std::fmt::Debug;
 use winreg::enums::*;
 use winreg::reg_key::RegKey;
+use winreg::reg_value::RegValue;
 use winreg::HKEY;
 
 thread_local! {
@@ -9,54 +11,41 @@ thread_local! {
 }
 
 pub struct App {
-    reg: RegKey,
+    name: String,
+    reg: RegValue,
 }
 struct AppList {
-    uninstalls: RegKey,
+    autostart: RegKey,
     index: usize,
 }
 impl Iterator for AppList {
     type Item = App;
     fn next(&mut self) -> Option<Self::Item> {
-        let key = self.uninstalls.enum_keys().nth(self.index)?.ok()?;
+        let value_= self.autostart.enum_values().nth(self.index)?.ok()?;
         self.index += 1;
-        let reg = self.uninstalls.open_subkey(key).ok()?;
-        Some(App { reg })
+        Some(App { 
+            name: value_.0,
+            reg: value_.1 
+        })
     }
 }
 impl AppList {
     fn new(hive: HKEY, path: &str) -> Result<Self, Box<dyn Error>> {
         let hive = RegKey::predef(hive);
-        let uninstalls = hive.open_subkey(path)?;
+        let autostart = hive.open_subkey(path)?;
 
         Ok(AppList {
-            uninstalls,
+            autostart,
             index: 0,
         })
     }
 }
 impl App {
-    fn get_value(&self, name: &str) -> Cow<str> {
-        self.reg
-            .get_value::<String, &str>(name)
-            .map(Cow::Owned)
-            .unwrap_or_else(|_| Cow::Borrowed(""))
+    pub fn get_key(&self) -> String {
+        self.name.to_string()
     }
-    pub fn name(&self) -> Cow<str> {
-        self.get_value("DisplayName")
-    }
-    pub fn exec(&self) -> Cow<str> {
-        self.get_value("DisplayIcon")
-    }
-    pub fn dump(&self) -> Cow<str> {
-        self.reg
-            .enum_values()
-            .map(|r| {
-                let (name, value) = r.unwrap();
-                format!("{}: {}\n", name, value)
-            })
-            .collect::<String>()
-            .into()
+    pub fn get_value(&self) -> String {
+        self.reg.to_string()
     }
     pub fn list() -> Result<impl Iterator<Item = App>, Box<dyn Error>> {
         let system_apps = AppList::new(
